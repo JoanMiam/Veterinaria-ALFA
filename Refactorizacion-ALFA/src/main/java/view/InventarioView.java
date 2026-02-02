@@ -33,14 +33,13 @@ public class InventarioView {
     private void initialize() {
         frame = new JFrame("Inventario Veterinaria");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(900, 550);
+        frame.setSize(1100, 650); // Aumentado para mejor visualización
         frame.setLayout(new BorderLayout());
         frame.setLocationRelativeTo(null);
 
         model = new DefaultTableModel(
-                new String[]{"ID", "Nombre", "Existencias", "Lote", "Caducidad", "Fecha Entrada"},
-                0
-        ) {
+                new String[] { "ID", "Nombre", "Existencias", "Lote", "Caducidad", "Fecha Entrada" },
+                0) {
             @Override
             public boolean isCellEditable(int row, int column) {
                 return false;
@@ -48,7 +47,7 @@ public class InventarioView {
         };
 
         table = new JTable(model);
-        table.setRowHeight(25);
+        table.setRowHeight(30); // Aumentado para mejor legibilidad
         table.setFont(new Font("Arial", Font.PLAIN, 14));
         table.getTableHeader().setFont(new Font("Arial", Font.BOLD, 16));
         table.getTableHeader().setBackground(new Color(50, 50, 50));
@@ -75,6 +74,7 @@ public class InventarioView {
                 hoverRenderer.setHoveredRow(-1);
                 table.repaint();
             }
+
             @Override
             public void mouseClicked(MouseEvent e) {
                 int row = table.rowAtPoint(e.getPoint());
@@ -115,8 +115,9 @@ public class InventarioView {
         topPanel.add(rightPanel, BorderLayout.EAST);
         frame.add(topPanel, BorderLayout.NORTH);
 
-        // Panel inferior con botones
-        JPanel buttonPanel = new JPanel(new FlowLayout());
+        // Panel inferior con botones - Mejorado con más espaciado
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 12)); // Más espacio entre botones
+        buttonPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10)); // Padding alrededor
         JButton btnAgregar = createButton("Agregar", "");
         addHoverEffect(btnAgregar);
         JButton btnEliminar = createButton("Eliminar", "");
@@ -166,8 +167,7 @@ public class InventarioView {
                         "Medicamentos próximos a caducar: " + proximos.size() + "\n" +
                                 "Medicamentos ya caducados: " + caducados.size(),
                         "Alerta de Caducidad",
-                        JOptionPane.WARNING_MESSAGE
-                );
+                        JOptionPane.WARNING_MESSAGE);
             }
         });
     }
@@ -197,6 +197,7 @@ public class InventarioView {
                 button.setBackground(hoverBg);
                 button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             }
+
             @Override
             public void mouseExited(MouseEvent e) {
                 button.setBackground(normalBg);
@@ -235,13 +236,15 @@ public class InventarioView {
     private void eliminarProducto() {
         int[] selectedRows = table.getSelectedRows();
         if (selectedRows.length == 0) {
-            JOptionPane.showMessageDialog(frame, "Selecciona un medicamento para eliminar.", "Aviso", JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(frame, "Selecciona un medicamento para eliminar.", "Aviso",
+                    JOptionPane.WARNING_MESSAGE);
             return;
         }
         String mensajeConfirmacion = (selectedRows.length == 1)
                 ? "¿Estás seguro de eliminar este medicamento?"
                 : "¿Estás seguro de eliminar los medicamentos seleccionados?";
-        int confirm = JOptionPane.showConfirmDialog(frame, mensajeConfirmacion, "Confirmación", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+        int confirm = JOptionPane.showConfirmDialog(frame, mensajeConfirmacion, "Confirmación",
+                JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
         if (confirm == JOptionPane.YES_OPTION) {
             boolean allSuccess = true;
             for (int selectedRow : selectedRows) {
@@ -258,7 +261,8 @@ public class InventarioView {
                         : "Medicamentos eliminados con éxito.";
                 JOptionPane.showMessageDialog(frame, mensajeExito, "Eliminado", JOptionPane.INFORMATION_MESSAGE);
             } else {
-                JOptionPane.showMessageDialog(frame, "Error al eliminar alguno(s) medicamento(s).", "Error", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(frame, "Error al eliminar alguno(s) medicamento(s).", "Error",
+                        JOptionPane.ERROR_MESSAGE);
             }
         }
     }
@@ -266,7 +270,8 @@ public class InventarioView {
     private void editarProducto() {
         int selectedRow = table.getSelectedRow();
         if (selectedRow == -1) {
-            JOptionPane.showMessageDialog(frame, "Selecciona un medicamento para editar.", "Aviso", JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(frame, "Selecciona un medicamento para editar.", "Aviso",
+                    JOptionPane.WARNING_MESSAGE);
             return;
         }
         int modelRow = table.convertRowIndexToModel(selectedRow);
@@ -285,8 +290,7 @@ public class InventarioView {
                 existencias,
                 lote,
                 caducidad,
-                fechaEntrada
-        );
+                fechaEntrada);
     }
 
     private void exportarCSV() {
@@ -321,7 +325,8 @@ public class InventarioView {
     }
 
     /**
-     * Renderer para “iluminar” la fila donde está el mouse sin cambiar la selección real.
+     * Renderer para “iluminar” la fila donde está el mouse sin cambiar la selección
+     * real.
      * Además, para la columna "Caducidad":
      * - Se asume que en la BD se guarda "yyyy-MM".
      * - Se marca con rojo fuerte si el producto ya caducó.

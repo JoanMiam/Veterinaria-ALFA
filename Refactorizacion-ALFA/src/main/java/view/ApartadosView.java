@@ -29,14 +29,13 @@ public class ApartadosView extends JDialog {
     }
 
     private void initialize() {
-        setSize(800, 500);
+        setSize(950, 600); // Aumentado para mejor visualización
         setLayout(new BorderLayout());
         setLocationRelativeTo(parentFrame);
 
         model = new DefaultTableModel(
-                new String[]{"ID", "Nombre", "Existencias", "Lote", "Caducidad", "Fecha Entrada", "Fecha Apartado"},
-                0
-        ) {
+                new String[] { "ID", "Nombre", "Existencias", "Lote", "Caducidad", "Fecha Entrada", "Fecha Apartado" },
+                0) {
             @Override
             public boolean isCellEditable(int row, int column) {
                 return false;
@@ -44,7 +43,7 @@ public class ApartadosView extends JDialog {
         };
 
         table = new JTable(model);
-        table.setRowHeight(25);
+        table.setRowHeight(30); // Aumentado para mejor legibilidad
         table.setFont(new Font("Arial", Font.PLAIN, 14));
         table.getTableHeader().setFont(new Font("Arial", Font.BOLD, 16));
         table.getTableHeader().setBackground(new Color(50, 50, 50));
@@ -78,8 +77,10 @@ public class ApartadosView extends JDialog {
         JScrollPane scrollPane = new JScrollPane(table);
         add(scrollPane, BorderLayout.CENTER);
 
-        // Panel inferior con botones: Registrar, Eliminar, Refrescar, Exportar
-        JPanel buttonPanel = new JPanel(new FlowLayout());
+        // Panel inferior con botones: Registrar, Eliminar, Refrescar, Exportar -
+        // Mejorado con más espaciado
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 12)); // Más espacio entre botones
+        buttonPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10)); // Padding alrededor
         JButton btnRegistrar = createButton("Registrar Apartado");
         JButton btnEliminar = createButton("Eliminar"); // Se asigna el rojo desde createButton
         JButton btnRefrescar = createButton("Refrescar");
@@ -121,11 +122,13 @@ public class ApartadosView extends JDialog {
         new RegistrarApartadoView(this, controller);
     }
 
-    // Elimina uno o más apartados (actualiza la base de datos, por ejemplo, quitando el apartado)
+    // Elimina uno o más apartados (actualiza la base de datos, por ejemplo,
+    // quitando el apartado)
     private void eliminarApartado() {
         int[] selectedRows = table.getSelectedRows();
         if (selectedRows.length == 0) {
-            JOptionPane.showMessageDialog(this, "Seleccione uno o más apartados para eliminar.", "Aviso", JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Seleccione uno o más apartados para eliminar.", "Aviso",
+                    JOptionPane.WARNING_MESSAGE);
             return;
         }
         int confirm = JOptionPane.showConfirmDialog(
@@ -133,8 +136,7 @@ public class ApartadosView extends JDialog {
                 "¿Está seguro de eliminar los apartados seleccionados?",
                 "Confirmación",
                 JOptionPane.YES_NO_OPTION,
-                JOptionPane.WARNING_MESSAGE
-        );
+                JOptionPane.WARNING_MESSAGE);
         if (confirm == JOptionPane.YES_OPTION) {
             boolean allSuccess = true;
             for (int i = selectedRows.length - 1; i >= 0; i--) {
@@ -150,14 +152,12 @@ public class ApartadosView extends JDialog {
                                 ? "Apartado eliminado correctamente."
                                 : "Apartados eliminados correctamente.",
                         "Éxito",
-                        JOptionPane.INFORMATION_MESSAGE
-                );
+                        JOptionPane.INFORMATION_MESSAGE);
             } else {
                 JOptionPane.showMessageDialog(this,
                         "Hubo errores al eliminar algunos apartados.",
                         "Error",
-                        JOptionPane.ERROR_MESSAGE
-                );
+                        JOptionPane.ERROR_MESSAGE);
             }
             cargarDatos();
         }
@@ -167,11 +167,13 @@ public class ApartadosView extends JDialog {
     private void editarApartado() {
         int selectedRow = table.getSelectedRow();
         if (selectedRow == -1) {
-            JOptionPane.showMessageDialog(this, "Selecciona un apartado para editar.", "Aviso", JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Selecciona un apartado para editar.", "Aviso",
+                    JOptionPane.WARNING_MESSAGE);
             return;
         }
         if (table.getSelectedRowCount() > 1) {
-            JOptionPane.showMessageDialog(this, "Selecciona solo un apartado para editar.", "Aviso", JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Selecciona solo un apartado para editar.", "Aviso",
+                    JOptionPane.WARNING_MESSAGE);
             return;
         }
         int modelRow = table.convertRowIndexToModel(selectedRow);
@@ -232,6 +234,7 @@ public class ApartadosView extends JDialog {
                 button.setBackground(hoverBg);
                 button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             }
+
             @Override
             public void mouseExited(MouseEvent e) {
                 button.setBackground(normalBg);
@@ -275,9 +278,11 @@ public class ApartadosView extends JDialog {
     }
 
     /**
-     * Renderer para “iluminar” la fila donde está el mouse sin cambiar la selección real.
+     * Renderer para “iluminar” la fila donde está el mouse sin cambiar la selección
+     * real.
      * Además, para la columna "Caducidad" (índice 4):
-     * - Se asume que en la BD está guardada como "yyyy-MM" y se parsea con YearMonth.
+     * - Se asume que en la BD está guardada como "yyyy-MM" y se parsea con
+     * YearMonth.
      * - Se marca con rojo fuerte si el producto ya caducó.
      * - Se marca con rojo claro si está próximo a caducar (dentro de 30 días).
      */

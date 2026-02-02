@@ -32,7 +32,7 @@ public class VentasView extends JDialog {
     }
 
     private void initialize() {
-        setSize(700, 500);
+        setSize(900, 600); // Aumentado para mejor visualización
         setLayout(new BorderLayout());
         setLocationRelativeTo(parentFrame);
 
@@ -41,7 +41,7 @@ public class VentasView extends JDialog {
         filterPanel.setBackground(new Color(240, 240, 240));
         filterPanel.add(new JLabel("Filtrar por:"));
 
-        String[] criterios = {"ID Venta", "ID Producto", "Nombre", "Cantidad", "Fecha"};
+        String[] criterios = { "ID Venta", "ID Producto", "Nombre", "Cantidad", "Fecha" };
         cmbFiltro = new JComboBox<>(criterios);
         filterPanel.add(cmbFiltro);
 
@@ -53,9 +53,9 @@ public class VentasView extends JDialog {
 
         // Modelo de tabla
         model = new DefaultTableModel(
-                new String[]{"ID Venta", "ID Producto", "Nombre del Medicamento", "Cantidad Vendida", "Fecha de Venta"},
-                0
-        ) {
+                new String[] { "ID Venta", "ID Producto", "Nombre del Medicamento", "Cantidad Vendida",
+                        "Fecha de Venta" },
+                0) {
             @Override
             public boolean isCellEditable(int row, int column) {
                 return false;
@@ -65,13 +65,12 @@ public class VentasView extends JDialog {
         table = new JTable(model);
         table.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
         table.setFillsViewportHeight(true);
-        table.setRowHeight(25);
+        table.setRowHeight(30); // Aumentado para mejor legibilidad
         table.setFont(new Font("Arial", Font.PLAIN, 14));
         table.getTableHeader().setFont(new Font("Arial", Font.BOLD, 16));
         table.getTableHeader().setBackground(new Color(50, 50, 50));
         table.getTableHeader().setForeground(Color.WHITE);
         table.getTableHeader().setReorderingAllowed(false);
-
 
         rowSorter = new TableRowSorter<>(model);
         table.setRowSorter(rowSorter);
@@ -100,16 +99,17 @@ public class VentasView extends JDialog {
         JScrollPane scrollPane = new JScrollPane(table);
         add(scrollPane, BorderLayout.CENTER);
 
-        // Panel de botones
-        JPanel buttonPanel = new JPanel(new FlowLayout());
+        // Panel de botones - Mejorado con más espaciado
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 12)); // Más espacio entre botones
+        buttonPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10)); // Padding alrededor
         buttonPanel.setBackground(new Color(240, 240, 240));
 
         // Creamos los botones con su color respectivo
-        JButton btnAgregarVenta    = createButton("Agregar Venta",   new Color(30, 136, 229));
-        JButton btnEditarVenta    = createButton("Editar Venta",    new Color(30, 136, 229));
-        JButton btnEliminarVenta  = createButton("Eliminar",        new Color(211, 47, 47)); // Rojo
-        JButton btnExportarReporte= createButton("Exportar Reporte",new Color(30, 136, 229));
-        JButton btnRefrescar      = createButton("Refrescar Tabla", new Color(30, 136, 229));
+        JButton btnAgregarVenta = createButton("Agregar Venta", new Color(30, 136, 229));
+        JButton btnEditarVenta = createButton("Editar Venta", new Color(30, 136, 229));
+        JButton btnEliminarVenta = createButton("Eliminar", new Color(211, 47, 47)); // Rojo
+        JButton btnExportarReporte = createButton("Exportar Reporte", new Color(30, 136, 229));
+        JButton btnRefrescar = createButton("Refrescar Tabla", new Color(30, 136, 229));
 
         buttonPanel.add(btnAgregarVenta);
         buttonPanel.add(btnEditarVenta);
@@ -128,9 +128,17 @@ public class VentasView extends JDialog {
 
         // Filtro en tiempo real
         txtFiltrar.getDocument().addDocumentListener(new DocumentListener() {
-            public void insertUpdate(DocumentEvent e) { aplicarFiltroAvanzado(); }
-            public void removeUpdate(DocumentEvent e) { aplicarFiltroAvanzado(); }
-            public void changedUpdate(DocumentEvent e) { aplicarFiltroAvanzado(); }
+            public void insertUpdate(DocumentEvent e) {
+                aplicarFiltroAvanzado();
+            }
+
+            public void removeUpdate(DocumentEvent e) {
+                aplicarFiltroAvanzado();
+            }
+
+            public void changedUpdate(DocumentEvent e) {
+                aplicarFiltroAvanzado();
+            }
         });
 
         // Cargar datos
@@ -170,6 +178,7 @@ public class VentasView extends JDialog {
                 button.setBackground(hoverBg);
                 button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             }
+
             @Override
             public void mouseExited(MouseEvent e) {
                 button.setBackground(normalBg);
@@ -211,8 +220,7 @@ public class VentasView extends JDialog {
                     this,
                     "Selecciona una venta para editar.",
                     "Aviso",
-                    JOptionPane.WARNING_MESSAGE
-            );
+                    JOptionPane.WARNING_MESSAGE);
             return;
         }
 
@@ -223,7 +231,8 @@ public class VentasView extends JDialog {
         String cantidadVendida = model.getValueAt(modelRow, 3).toString();
         String fechaVenta = model.getValueAt(modelRow, 4).toString();
 
-        System.out.println("ID Venta: " + idVenta + ", Nombre: " + nombreMedicamento + ", Cantidad: " + cantidadVendida + ", Fecha: " + fechaVenta);
+        System.out.println("ID Venta: " + idVenta + ", Nombre: " + nombreMedicamento + ", Cantidad: " + cantidadVendida
+                + ", Fecha: " + fechaVenta);
 
         new EditarVentaView(this, controller, idVenta, nombreMedicamento, cantidadVendida, fechaVenta);
     }
@@ -235,8 +244,7 @@ public class VentasView extends JDialog {
                     this,
                     "Selecciona una o más ventas para eliminar.",
                     "Aviso",
-                    JOptionPane.WARNING_MESSAGE
-            );
+                    JOptionPane.WARNING_MESSAGE);
             return;
         }
 
@@ -248,8 +256,7 @@ public class VentasView extends JDialog {
                 this,
                 mensajeConfirmacion,
                 "Confirmación",
-                JOptionPane.YES_NO_OPTION
-        );
+                JOptionPane.YES_NO_OPTION);
 
         if (confirm == JOptionPane.YES_OPTION) {
             // Recorremos en orden descendente para no alterar los índices
@@ -262,8 +269,7 @@ public class VentasView extends JDialog {
                             this,
                             "Error al eliminar la venta con ID: " + id,
                             "Error",
-                            JOptionPane.ERROR_MESSAGE
-                    );
+                            JOptionPane.ERROR_MESSAGE);
                 }
             }
             actualizarTabla();
@@ -276,8 +282,7 @@ public class VentasView extends JDialog {
                     this,
                     mensajeExito,
                     "Información",
-                    JOptionPane.INFORMATION_MESSAGE
-            );
+                    JOptionPane.INFORMATION_MESSAGE);
         }
     }
 
@@ -294,14 +299,16 @@ public class VentasView extends JDialog {
                     for (int col = 0; col < model.getColumnCount(); col++) {
                         Object value = model.getValueAt(row, col);
                         writer.append(value != null ? value.toString() : "");
-                        if (col < model.getColumnCount() - 1) writer.append(",");
+                        if (col < model.getColumnCount() - 1)
+                            writer.append(",");
                     }
                     writer.append("\n");
                 }
                 writer.flush();
                 JOptionPane.showMessageDialog(this, "Reporte exportado con éxito.");
             } catch (Exception e) {
-                JOptionPane.showMessageDialog(this, "Error al exportar el reporte: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(this, "Error al exportar el reporte: " + e.getMessage(), "Error",
+                        JOptionPane.ERROR_MESSAGE);
             }
         }
     }
@@ -328,8 +335,7 @@ public class VentasView extends JDialog {
         @Override
         public Component getTableCellRendererComponent(
                 JTable table, Object value, boolean isSelected, boolean hasFocus,
-                int row, int column
-        ) {
+                int row, int column) {
             super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
 
             if (row == hoveredRow && !isSelected) {
