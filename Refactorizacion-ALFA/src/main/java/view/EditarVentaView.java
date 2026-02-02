@@ -14,10 +14,8 @@ public class EditarVentaView extends JDialog {
         setResizable(false);
         setLocationRelativeTo(parent);
 
-        // Depuración
         System.out.println("EditarVentaView -> ID: " + id + ", Nombre: " + nombre + ", Cantidad: " + cantidad + ", Fecha: " + fecha);
 
-        // Verificar y corregir los valores si es necesario (lógica intacta)
         boolean cantidadEsNumero = cantidad.matches("\\d+");
         boolean fechaEsValida = fecha.matches("\\d{4}-\\d{2}-\\d{2}");
 
@@ -25,34 +23,29 @@ public class EditarVentaView extends JDialog {
         String cantidadCorrecta = cantidadEsNumero ? cantidad : "0";
         String fechaCorrecta = fechaEsValida ? fecha : LocalDate.now().toString();
 
-        // Panel principal con GridBagLayout
         JPanel mainPanel = new JPanel(new GridBagLayout());
         mainPanel.setBackground(new Color(240, 240, 240));
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(10, 10, 10, 10);
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
-        // Etiqueta: Nombre del Medicamento
         gbc.gridx = 0;
         gbc.gridy = 0;
         JLabel lblNombre = new JLabel("Nombre del Medicamento:");
         lblNombre.setFont(new Font("Arial", Font.BOLD, 14));
         mainPanel.add(lblNombre, gbc);
 
-        // Campo de texto: Nombre
         gbc.gridx = 1;
         JTextField txtNombre = new JTextField(nombreCorrecto, 15);
         txtNombre.setFont(new Font("Arial", Font.PLAIN, 14));
         mainPanel.add(txtNombre, gbc);
 
-        // Etiqueta: Cantidad Vendida
         gbc.gridx = 0;
         gbc.gridy = 1;
         JLabel lblCantidad = new JLabel("Cantidad Vendida:");
         lblCantidad.setFont(new Font("Arial", Font.BOLD, 14));
         mainPanel.add(lblCantidad, gbc);
 
-        // JSpinner para la cantidad
         gbc.gridx = 1;
         int valorCantidad = 0;
         try {
@@ -61,28 +54,23 @@ public class EditarVentaView extends JDialog {
                 valorCantidad = 0;
             }
         } catch (NumberFormatException ex) {
-            // Si no es un número, se queda en 0
         }
         JSpinner spinnerCantidad = new JSpinner(new SpinnerNumberModel(valorCantidad, 0, null, 1));
-        // Ajustar editor para tener un ancho similar a 15 columnas
         JSpinner.DefaultEditor editor = (JSpinner.DefaultEditor) spinnerCantidad.getEditor();
         editor.getTextField().setColumns(15);
         editor.getTextField().setFont(new Font("Arial", Font.PLAIN, 14));
         mainPanel.add(spinnerCantidad, gbc);
 
-        // Etiqueta: Fecha de Venta
         gbc.gridx = 0;
         gbc.gridy = 2;
         JLabel lblFecha = new JLabel("Fecha de Venta (YYYY-MM-DD):");
         lblFecha.setFont(new Font("Arial", Font.BOLD, 14));
         mainPanel.add(lblFecha, gbc);
 
-        // Reemplazamos el campo de texto por JDateChooser
         gbc.gridx = 1;
         JDateChooser dateChooser = new JDateChooser();
         dateChooser.setDateFormatString("yyyy-MM-dd");
         dateChooser.setFont(new Font("Arial", Font.PLAIN, 14));
-        // Si la fechaCorrecta se pudo parsear, la mostramos en el dateChooser
         try {
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
             Date parsedDate = sdf.parse(fechaCorrecta);
@@ -92,7 +80,6 @@ public class EditarVentaView extends JDialog {
         }
         mainPanel.add(dateChooser, gbc);
 
-        // Panel de botones
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 10));
         buttonPanel.setBackground(new Color(240, 240, 240));
 
@@ -110,15 +97,12 @@ public class EditarVentaView extends JDialog {
         btnCancelar.setFocusPainted(false);
         btnCancelar.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
 
-        // Lógica de botones (sin cambios)
         btnCancelar.addActionListener(e -> dispose());
         btnGuardar.addActionListener(e -> {
             String nuevoNombre = txtNombre.getText().trim();
-            // Obtenemos el valor del spinner en lugar de txtCantidad
             Object spinnerValue = spinnerCantidad.getValue();
             String nuevaCantidad = spinnerValue != null ? spinnerValue.toString() : "0";
 
-            // Obtenemos la fecha del dateChooser
             Date selectedDate = dateChooser.getDate();
             if (selectedDate == null) {
                 JOptionPane.showMessageDialog(
@@ -129,7 +113,6 @@ public class EditarVentaView extends JDialog {
                 );
                 return;
             }
-            // Convertimos la fecha a String (yyyy-MM-dd) para mantener la misma lógica
             String nuevaFecha = new SimpleDateFormat("yyyy-MM-dd").format(selectedDate);
 
             if (nuevoNombre.isEmpty() || nuevaCantidad.isEmpty() || nuevaFecha.isEmpty()) {
@@ -148,7 +131,6 @@ public class EditarVentaView extends JDialog {
                 return;
             }
 
-            // Validar el formato de la fecha (lógica original)
             try {
                 java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd");
                 java.time.LocalDate.parse(nuevaFecha, formatter);
@@ -175,12 +157,9 @@ public class EditarVentaView extends JDialog {
         buttonPanel.add(btnGuardar);
         buttonPanel.add(btnCancelar);
 
-        // Agregar paneles al contenedor principal
         getContentPane().setLayout(new BorderLayout());
         getContentPane().add(mainPanel, BorderLayout.CENTER);
         getContentPane().add(buttonPanel, BorderLayout.SOUTH);
-
-        // Ajustar el tamaño automáticamente
         pack();
         setLocationRelativeTo(null);
         setVisible(true);

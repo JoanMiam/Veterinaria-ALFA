@@ -8,7 +8,6 @@ import java.util.Calendar;
 public class AgregarMedicamentoView extends JDialog {
     private JTextField txtNombre, txtLote;
     private JSpinner spinnerExistencias;
-    // Reemplazamos el JDateChooser por dos combos:
     private JComboBox<Integer> comboAnio;
     private JComboBox<Integer> comboMes;
 
@@ -39,30 +38,24 @@ public class AgregarMedicamentoView extends JDialog {
         add(title, gbc);
         gbc.gridwidth = 1;
 
-        // Campo Nombre
         txtNombre = createTextField();
-        // Spinner para existencias
         spinnerExistencias = new JSpinner(new SpinnerNumberModel(0, 0, null, 1));
         JSpinner.DefaultEditor editor = (JSpinner.DefaultEditor) spinnerExistencias.getEditor();
         editor.getTextField().setColumns(15);
         editor.getTextField().setFont(new Font("Arial", Font.PLAIN, 14));
 
-        // Campo Lote
         txtLote = createTextField();
 
-        // Combos para año y mes de caducidad
         comboAnio = new JComboBox<>();
         comboMes = new JComboBox<>();
         comboAnio.setFont(new Font("Arial", Font.PLAIN, 14));
         comboMes.setFont(new Font("Arial", Font.PLAIN, 14));
 
-        // Rellenamos el combo de años (por ejemplo, desde el actual hasta 10 años adelante)
         int currentYear = Calendar.getInstance().get(Calendar.YEAR);
         for (int year = currentYear; year <= currentYear + 10; year++) {
             comboAnio.addItem(year);
         }
 
-        // Rellenamos el combo de meses (1 a 12)
         for (int month = 1; month <= 12; month++) {
             comboMes.addItem(month);
         }
@@ -71,7 +64,6 @@ public class AgregarMedicamentoView extends JDialog {
         addLabeledField(gbc, 2, "Existencias:", spinnerExistencias);
         addLabeledField(gbc, 3, "Lote:", txtLote);
 
-        // Para caducidad, mostramos dos combos en la misma línea
         JPanel cadPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
         cadPanel.setBackground(new Color(240, 240, 240));
         cadPanel.add(new JLabel("Año:"));
@@ -81,7 +73,6 @@ public class AgregarMedicamentoView extends JDialog {
 
         addLabeledField(gbc, 4, "Caducidad (YYYY-MM):", cadPanel);
 
-        // Panel de botones
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
         buttonPanel.setBackground(new Color(240, 240, 240));
         JButton btnGuardar = createStyledButton("Guardar", new Color(30, 136, 229));
@@ -134,7 +125,6 @@ public class AgregarMedicamentoView extends JDialog {
         String existencias = spinnerExistencias.getValue().toString().trim();
         String lote = txtLote.getText().trim();
 
-        // Validar campos de texto vacíos
         if (nombre.isEmpty() || existencias.isEmpty() || lote.isEmpty()) {
             JOptionPane.showMessageDialog(this,
                     "Todos los campos son obligatorios.",
@@ -144,14 +134,11 @@ public class AgregarMedicamentoView extends JDialog {
             return;
         }
 
-        // Obtener año y mes de los combos
         Integer anioSeleccionado = (Integer) comboAnio.getSelectedItem();
         Integer mesSeleccionado = (Integer) comboMes.getSelectedItem();
 
-        // Construimos "yyyy-MM"
         String caducidad = String.format("%04d-%02d", anioSeleccionado, mesSeleccionado);
 
-        // Llamar al controlador
         if (controller.agregarProducto(nombre, existencias, lote, caducidad)) {
             JOptionPane.showMessageDialog(getParent(), "Medicamento agregado con éxito.");
             dispose();

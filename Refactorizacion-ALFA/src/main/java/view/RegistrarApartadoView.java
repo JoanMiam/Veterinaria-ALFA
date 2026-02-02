@@ -24,14 +24,12 @@ public class RegistrarApartadoView extends JDialog {
 
     private void initialize() {
         setLayout(new BorderLayout());
-        // Panel principal con GridBagLayout y fondo claro
         JPanel panel = new JPanel(new GridBagLayout());
         panel.setBackground(new Color(240, 240, 240));
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(10, 10, 10, 10);
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
-        // Etiqueta y campo para "Nombre o ID del Producto"
         gbc.gridx = 0;
         gbc.gridy = 0;
         JLabel lblSearch = new JLabel("Nombre o ID del Producto:");
@@ -43,7 +41,6 @@ public class RegistrarApartadoView extends JDialog {
         txtSearch.setFont(new Font("Arial", Font.PLAIN, 14));
         panel.add(txtSearch, gbc);
 
-        // Etiqueta y campo para "Fecha de Apartado"
         gbc.gridx = 0;
         gbc.gridy = 1;
         JLabel lblFecha = new JLabel("Fecha de Apartado (YYYY-MM-DD):");
@@ -56,7 +53,6 @@ public class RegistrarApartadoView extends JDialog {
         dateChooserApartado.setFont(new Font("Arial", Font.PLAIN, 14));
         panel.add(dateChooserApartado, gbc);
 
-        // Panel de botones con estilo consistente
         JPanel btnPanel = new JPanel(new FlowLayout());
         btnPanel.setBackground(new Color(240, 240, 240));
 
@@ -105,10 +101,8 @@ public class RegistrarApartadoView extends JDialog {
 
         int id = -1;
         try {
-            // Si el campo es numérico, se interpreta como ID
             id = Integer.parseInt(search);
         } catch (NumberFormatException e) {
-            // Si no es numérico, se busca el producto por nombre
             id = controller.obtenerProductoIdPorNombre(search);
         }
 
@@ -126,7 +120,6 @@ public class RegistrarApartadoView extends JDialog {
         }
     }
 
-    // Agrega efecto hover a un botón: al entrar se aclara el color, al salir se restablece
     private void addHoverEffect(final JButton button) {
         final Color normalBg = button.getBackground();
         final Color hoverBg = normalBg.brighter();

@@ -11,6 +11,8 @@ import java.awt.*;
 import java.awt.event.*;
 import java.io.File;
 import java.util.Arrays;
+import java.util.List;
+import model.entities.Venta;
 
 public class VentasView extends JDialog {
     private InventarioController controller;
@@ -21,7 +23,6 @@ public class VentasView extends JDialog {
     private JTextField txtFiltrar;
     private JComboBox<String> cmbFiltro;
 
-    // Renderer personalizado para el “hover” en la tabla
     private HoverTableCellRenderer hoverRenderer;
 
     public VentasView(JFrame parent, InventarioController controller) {
@@ -32,16 +33,15 @@ public class VentasView extends JDialog {
     }
 
     private void initialize() {
-        setSize(700, 500);
+        setSize(900, 600); 
         setLayout(new BorderLayout());
         setLocationRelativeTo(parentFrame);
 
-        // Panel de filtros
         JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         filterPanel.setBackground(new Color(240, 240, 240));
         filterPanel.add(new JLabel("Filtrar por:"));
 
-        String[] criterios = {"ID Venta", "ID Producto", "Nombre", "Cantidad", "Fecha"};
+        String[] criterios = { "ID Venta", "ID Producto", "Nombre", "Cantidad", "Fecha" };
         cmbFiltro = new JComboBox<>(criterios);
         filterPanel.add(cmbFiltro);
 
@@ -51,11 +51,10 @@ public class VentasView extends JDialog {
 
         add(filterPanel, BorderLayout.NORTH);
 
-        // Modelo de tabla
         model = new DefaultTableModel(
-                new String[]{"ID Venta", "ID Producto", "Nombre del Medicamento", "Cantidad Vendida", "Fecha de Venta"},
-                0
-        ) {
+                new String[] { "ID Venta", "ID Producto", "Nombre del Medicamento", "Cantidad Vendida",
+                        "Fecha de Venta" },
+                0) {
             @Override
             public boolean isCellEditable(int row, int column) {
                 return false;
@@ -65,22 +64,19 @@ public class VentasView extends JDialog {
         table = new JTable(model);
         table.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
         table.setFillsViewportHeight(true);
-        table.setRowHeight(25);
+        table.setRowHeight(30); 
         table.setFont(new Font("Arial", Font.PLAIN, 14));
         table.getTableHeader().setFont(new Font("Arial", Font.BOLD, 16));
         table.getTableHeader().setBackground(new Color(50, 50, 50));
         table.getTableHeader().setForeground(Color.WHITE);
         table.getTableHeader().setReorderingAllowed(false);
 
-
         rowSorter = new TableRowSorter<>(model);
         table.setRowSorter(rowSorter);
 
-        // Renderer para hover en la tabla
         hoverRenderer = new HoverTableCellRenderer();
         table.setDefaultRenderer(Object.class, hoverRenderer);
 
-        // Detectar movimiento del mouse para resaltar la fila
         table.addMouseMotionListener(new MouseMotionAdapter() {
             @Override
             public void mouseMoved(MouseEvent e) {
@@ -100,16 +96,15 @@ public class VentasView extends JDialog {
         JScrollPane scrollPane = new JScrollPane(table);
         add(scrollPane, BorderLayout.CENTER);
 
-        // Panel de botones
-        JPanel buttonPanel = new JPanel(new FlowLayout());
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 12)); 
+        buttonPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10)); 
         buttonPanel.setBackground(new Color(240, 240, 240));
 
-        // Creamos los botones con su color respectivo
-        JButton btnAgregarVenta    = createButton("Agregar Venta",   new Color(30, 136, 229));
-        JButton btnEditarVenta    = createButton("Editar Venta",    new Color(30, 136, 229));
-        JButton btnEliminarVenta  = createButton("Eliminar",        new Color(211, 47, 47)); // Rojo
-        JButton btnExportarReporte= createButton("Exportar Reporte",new Color(30, 136, 229));
-        JButton btnRefrescar      = createButton("Refrescar Tabla", new Color(30, 136, 229));
+        JButton btnAgregarVenta = createButton("Agregar Venta", new Color(30, 136, 229));
+        JButton btnEditarVenta = createButton("Editar Venta", new Color(30, 136, 229));
+        JButton btnEliminarVenta = createButton("Eliminar", new Color(211, 47, 47)); 
+        JButton btnExportarReporte = createButton("Exportar Reporte", new Color(30, 136, 229));
+        JButton btnRefrescar = createButton("Refrescar Tabla", new Color(30, 136, 229));
 
         buttonPanel.add(btnAgregarVenta);
         buttonPanel.add(btnEditarVenta);
@@ -119,50 +114,46 @@ public class VentasView extends JDialog {
 
         add(buttonPanel, BorderLayout.SOUTH);
 
-        // Listeners de los botones
         btnAgregarVenta.addActionListener(e -> openRegistrarVenta());
         btnEditarVenta.addActionListener(e -> editarVenta());
         btnEliminarVenta.addActionListener(e -> eliminarVenta());
         btnExportarReporte.addActionListener(e -> exportarReporte());
         btnRefrescar.addActionListener(e -> actualizarTabla());
 
-        // Filtro en tiempo real
         txtFiltrar.getDocument().addDocumentListener(new DocumentListener() {
-            public void insertUpdate(DocumentEvent e) { aplicarFiltroAvanzado(); }
-            public void removeUpdate(DocumentEvent e) { aplicarFiltroAvanzado(); }
-            public void changedUpdate(DocumentEvent e) { aplicarFiltroAvanzado(); }
+            public void insertUpdate(DocumentEvent e) {
+                aplicarFiltroAvanzado();
+            }
+
+            public void removeUpdate(DocumentEvent e) {
+                aplicarFiltroAvanzado();
+            }
+
+            public void changedUpdate(DocumentEvent e) {
+                aplicarFiltroAvanzado();
+            }
         });
 
-        // Cargar datos
         cargarVentas();
         setVisible(true);
     }
 
-    /**
-     * Crea un botón con un color base y hover effect.
-     */
     private JButton createButton(String text, Color baseColor) {
         JButton button = new JButton(text);
         button.setFont(new Font("Arial", Font.BOLD, 14));
         button.setFocusPainted(false);
         button.setForeground(Color.WHITE);
         button.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
-        // Color base
         button.setBackground(baseColor);
 
-        // Efecto hover
         addHoverEffect(button);
 
         return button;
     }
 
-    /**
-     * Agrega efecto de hover a un botón, aclarando (o oscureciendo) el color.
-     */
     private void addHoverEffect(final JButton button) {
         final Color normalBg = button.getBackground();
-        // Elige si quieres aclarar o oscurecer
-        final Color hoverBg = normalBg.brighter(); // o normalBg.darker()
+        final Color hoverBg = normalBg.brighter(); 
 
         button.addMouseListener(new MouseAdapter() {
             @Override
@@ -170,6 +161,7 @@ public class VentasView extends JDialog {
                 button.setBackground(hoverBg);
                 button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             }
+
             @Override
             public void mouseExited(MouseEvent e) {
                 button.setBackground(normalBg);
@@ -180,13 +172,12 @@ public class VentasView extends JDialog {
 
     private void cargarVentas() {
         model.setRowCount(0);
-        for (Object[] venta : controller.obtenerHistorialVentas()) {
-            System.out.println("Cargando en tabla -> " + Arrays.toString(venta)); // Depuración
-            if (venta.length == 5) {
-                model.addRow(venta);
-            } else {
-                System.err.println("Error: Registro de venta con tamaño incorrecto -> " + Arrays.toString(venta));
-            }
+        List<Venta> ventas = controller.obtenerHistorialVentas();
+        for (Venta v : ventas) {
+            model.addRow(new Object[] {
+                    v.getId(), v.getIdProducto(), v.getNombre(),
+                    v.getCantidad(), v.getFechaVenta()
+            });
         }
     }
 
@@ -211,8 +202,7 @@ public class VentasView extends JDialog {
                     this,
                     "Selecciona una venta para editar.",
                     "Aviso",
-                    JOptionPane.WARNING_MESSAGE
-            );
+                    JOptionPane.WARNING_MESSAGE);
             return;
         }
 
@@ -223,7 +213,8 @@ public class VentasView extends JDialog {
         String cantidadVendida = model.getValueAt(modelRow, 3).toString();
         String fechaVenta = model.getValueAt(modelRow, 4).toString();
 
-        System.out.println("ID Venta: " + idVenta + ", Nombre: " + nombreMedicamento + ", Cantidad: " + cantidadVendida + ", Fecha: " + fechaVenta);
+        System.out.println("ID Venta: " + idVenta + ", Nombre: " + nombreMedicamento + ", Cantidad: " + cantidadVendida
+                + ", Fecha: " + fechaVenta);
 
         new EditarVentaView(this, controller, idVenta, nombreMedicamento, cantidadVendida, fechaVenta);
     }
@@ -235,8 +226,7 @@ public class VentasView extends JDialog {
                     this,
                     "Selecciona una o más ventas para eliminar.",
                     "Aviso",
-                    JOptionPane.WARNING_MESSAGE
-            );
+                    JOptionPane.WARNING_MESSAGE);
             return;
         }
 
@@ -248,11 +238,9 @@ public class VentasView extends JDialog {
                 this,
                 mensajeConfirmacion,
                 "Confirmación",
-                JOptionPane.YES_NO_OPTION
-        );
+                JOptionPane.YES_NO_OPTION);
 
         if (confirm == JOptionPane.YES_OPTION) {
-            // Recorremos en orden descendente para no alterar los índices
             for (int i = selectedRows.length - 1; i >= 0; i--) {
                 int modelRow = table.convertRowIndexToModel(selectedRows[i]);
                 Object id = model.getValueAt(modelRow, 0);
@@ -262,8 +250,7 @@ public class VentasView extends JDialog {
                             this,
                             "Error al eliminar la venta con ID: " + id,
                             "Error",
-                            JOptionPane.ERROR_MESSAGE
-                    );
+                            JOptionPane.ERROR_MESSAGE);
                 }
             }
             actualizarTabla();
@@ -276,8 +263,7 @@ public class VentasView extends JDialog {
                     this,
                     mensajeExito,
                     "Información",
-                    JOptionPane.INFORMATION_MESSAGE
-            );
+                    JOptionPane.INFORMATION_MESSAGE);
         }
     }
 
@@ -294,14 +280,16 @@ public class VentasView extends JDialog {
                     for (int col = 0; col < model.getColumnCount(); col++) {
                         Object value = model.getValueAt(row, col);
                         writer.append(value != null ? value.toString() : "");
-                        if (col < model.getColumnCount() - 1) writer.append(",");
+                        if (col < model.getColumnCount() - 1)
+                            writer.append(",");
                     }
                     writer.append("\n");
                 }
                 writer.flush();
                 JOptionPane.showMessageDialog(this, "Reporte exportado con éxito.");
             } catch (Exception e) {
-                JOptionPane.showMessageDialog(this, "Error al exportar el reporte: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(this, "Error al exportar el reporte: " + e.getMessage(), "Error",
+                        JOptionPane.ERROR_MESSAGE);
             }
         }
     }
@@ -314,10 +302,6 @@ public class VentasView extends JDialog {
         return parentFrame;
     }
 
-    /**
-     * Renderer para “iluminar” la fila donde está el mouse en la tabla
-     * sin cambiar la selección real.
-     */
     private static class HoverTableCellRenderer extends DefaultTableCellRenderer {
         private int hoveredRow = -1;
 
@@ -328,12 +312,11 @@ public class VentasView extends JDialog {
         @Override
         public Component getTableCellRendererComponent(
                 JTable table, Object value, boolean isSelected, boolean hasFocus,
-                int row, int column
-        ) {
+                int row, int column) {
             super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
 
             if (row == hoveredRow && !isSelected) {
-                setBackground(new Color(220, 240, 255)); // Color “hover”
+                setBackground(new Color(220, 240, 255)); 
             } else {
                 setBackground(isSelected ? table.getSelectionBackground() : table.getBackground());
             }

@@ -1,6 +1,7 @@
 package view;
 
 import controller.InventarioController;
+import model.entities.Producto;
 import javax.swing.*;
 import javax.swing.table.*;
 import java.awt.*;
@@ -21,7 +22,6 @@ public class InventarioView {
     private TableRowSorter<DefaultTableModel> rowSorter;
     private JTextField txtBuscar;
 
-    // Renderer personalizado para la “fila hover”
     private HoverTableCellRenderer hoverRenderer;
 
     public InventarioView(InventarioController controller) {
@@ -33,14 +33,13 @@ public class InventarioView {
     private void initialize() {
         frame = new JFrame("Inventario Veterinaria");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(900, 550);
+        frame.setSize(1100, 650); 
         frame.setLayout(new BorderLayout());
         frame.setLocationRelativeTo(null);
 
         model = new DefaultTableModel(
-                new String[]{"ID", "Nombre", "Existencias", "Lote", "Caducidad", "Fecha Entrada"},
-                0
-        ) {
+                new String[] { "ID", "Nombre", "Existencias", "Lote", "Caducidad", "Fecha Entrada" },
+                0) {
             @Override
             public boolean isCellEditable(int row, int column) {
                 return false;
@@ -48,19 +47,17 @@ public class InventarioView {
         };
 
         table = new JTable(model);
-        table.setRowHeight(25);
+        table.setRowHeight(30); 
         table.setFont(new Font("Arial", Font.PLAIN, 14));
         table.getTableHeader().setFont(new Font("Arial", Font.BOLD, 16));
         table.getTableHeader().setBackground(new Color(50, 50, 50));
         table.getTableHeader().setForeground(Color.WHITE);
-        table.getTableHeader().setReorderingAllowed(false); // Evitar que el usuario reordene las columnas
+        table.getTableHeader().setReorderingAllowed(false); 
         table.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
 
-        // Renderer personalizado para hover en la tabla
         hoverRenderer = new HoverTableCellRenderer();
         table.setDefaultRenderer(Object.class, hoverRenderer);
 
-        // Listeners para “hover” en la tabla
         table.addMouseMotionListener(new MouseMotionAdapter() {
             @Override
             public void mouseMoved(MouseEvent e) {
@@ -75,6 +72,7 @@ public class InventarioView {
                 hoverRenderer.setHoveredRow(-1);
                 table.repaint();
             }
+
             @Override
             public void mouseClicked(MouseEvent e) {
                 int row = table.rowAtPoint(e.getPoint());
@@ -91,10 +89,8 @@ public class InventarioView {
         table.setRowSorter(rowSorter);
         configurarOrdenacion();
 
-        // Cargar los datos iniciales
         cargarDatos();
 
-        // Panel superior con campo de búsqueda
         JPanel topPanel = new JPanel(new BorderLayout());
         JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         txtBuscar = new JTextField(20);
@@ -115,12 +111,12 @@ public class InventarioView {
         topPanel.add(rightPanel, BorderLayout.EAST);
         frame.add(topPanel, BorderLayout.NORTH);
 
-        // Panel inferior con botones
-        JPanel buttonPanel = new JPanel(new FlowLayout());
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 12)); 
+        buttonPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10)); 
         JButton btnAgregar = createButton("Agregar", "");
         addHoverEffect(btnAgregar);
         JButton btnEliminar = createButton("Eliminar", "");
-        btnEliminar.setBackground(new Color(211, 47, 47)); // Rojo
+        btnEliminar.setBackground(new Color(211, 47, 47)); 
         addHoverEffect(btnEliminar);
         JButton btnEditar = createButton("Editar", "");
         addHoverEffect(btnEditar);
@@ -140,7 +136,6 @@ public class InventarioView {
 
         frame.add(buttonPanel, BorderLayout.SOUTH);
 
-        // Listeners de botones
         btnAgregar.addActionListener(e -> openAgregarMedicamento());
         btnEliminar.addActionListener(e -> eliminarProducto());
         btnEditar.addActionListener(e -> editarProducto());
@@ -157,17 +152,15 @@ public class InventarioView {
 
         frame.setVisible(true);
 
-        // Alerta de caducidad después de mostrar la ventana
         SwingUtilities.invokeLater(() -> {
-            List<Object[]> proximos = controller.obtenerMedicamentosProximosACaducar(30);
-            List<Object[]> caducados = controller.obtenerMedicamentosCaducados();
+            List<Producto> proximos = controller.obtenerMedicamentosProximosACaducar(30);
+            List<Producto> caducados = controller.obtenerMedicamentosCaducados();
             if (!proximos.isEmpty() || !caducados.isEmpty()) {
                 JOptionPane.showMessageDialog(frame,
                         "Medicamentos próximos a caducar: " + proximos.size() + "\n" +
                                 "Medicamentos ya caducados: " + caducados.size(),
                         "Alerta de Caducidad",
-                        JOptionPane.WARNING_MESSAGE
-                );
+                        JOptionPane.WARNING_MESSAGE);
             }
         });
     }
@@ -185,7 +178,6 @@ public class InventarioView {
     private void addHoverEffect(final JButton button) {
         final Color normalBg = button.getBackground();
         final Color hoverBg;
-        // Si el botón es rojo (Eliminar), usamos un hover con rojo más oscuro
         if (normalBg.getRed() == 211 && normalBg.getGreen() == 47 && normalBg.getBlue() == 47) {
             hoverBg = new Color(180, 30, 30);
         } else {
@@ -197,6 +189,7 @@ public class InventarioView {
                 button.setBackground(hoverBg);
                 button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             }
+
             @Override
             public void mouseExited(MouseEvent e) {
                 button.setBackground(normalBg);
@@ -206,7 +199,6 @@ public class InventarioView {
     }
 
     private void configurarOrdenacion() {
-        // Ordenar la columna 2 (Existencias) como entero
         rowSorter.setComparator(2, (o1, o2) -> {
             try {
                 return Integer.compare(Integer.parseInt(o1.toString()), Integer.parseInt(o2.toString()));
@@ -218,9 +210,12 @@ public class InventarioView {
 
     public void cargarDatos() {
         model.setRowCount(0);
-        Object[][] productos = controller.obtenerProductos();
-        for (Object[] prod : productos) {
-            model.addRow(prod);
+        List<Producto> productos = controller.obtenerProductos();
+        for (Producto p : productos) {
+            model.addRow(new Object[] {
+                    p.getId(), p.getNombre(), p.getExistencias(),
+                    p.getLote(), p.getCaducidad(), p.getFechaEntrada()
+            });
         }
     }
 
@@ -235,13 +230,15 @@ public class InventarioView {
     private void eliminarProducto() {
         int[] selectedRows = table.getSelectedRows();
         if (selectedRows.length == 0) {
-            JOptionPane.showMessageDialog(frame, "Selecciona un medicamento para eliminar.", "Aviso", JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(frame, "Selecciona un medicamento para eliminar.", "Aviso",
+                    JOptionPane.WARNING_MESSAGE);
             return;
         }
         String mensajeConfirmacion = (selectedRows.length == 1)
                 ? "¿Estás seguro de eliminar este medicamento?"
                 : "¿Estás seguro de eliminar los medicamentos seleccionados?";
-        int confirm = JOptionPane.showConfirmDialog(frame, mensajeConfirmacion, "Confirmación", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+        int confirm = JOptionPane.showConfirmDialog(frame, mensajeConfirmacion, "Confirmación",
+                JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
         if (confirm == JOptionPane.YES_OPTION) {
             boolean allSuccess = true;
             for (int selectedRow : selectedRows) {
@@ -258,7 +255,8 @@ public class InventarioView {
                         : "Medicamentos eliminados con éxito.";
                 JOptionPane.showMessageDialog(frame, mensajeExito, "Eliminado", JOptionPane.INFORMATION_MESSAGE);
             } else {
-                JOptionPane.showMessageDialog(frame, "Error al eliminar alguno(s) medicamento(s).", "Error", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(frame, "Error al eliminar alguno(s) medicamento(s).", "Error",
+                        JOptionPane.ERROR_MESSAGE);
             }
         }
     }
@@ -266,7 +264,8 @@ public class InventarioView {
     private void editarProducto() {
         int selectedRow = table.getSelectedRow();
         if (selectedRow == -1) {
-            JOptionPane.showMessageDialog(frame, "Selecciona un medicamento para editar.", "Aviso", JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(frame, "Selecciona un medicamento para editar.", "Aviso",
+                    JOptionPane.WARNING_MESSAGE);
             return;
         }
         int modelRow = table.convertRowIndexToModel(selectedRow);
@@ -285,8 +284,7 @@ public class InventarioView {
                 existencias,
                 lote,
                 caducidad,
-                fechaEntrada
-        );
+                fechaEntrada);
     }
 
     private void exportarCSV() {
@@ -320,13 +318,7 @@ public class InventarioView {
         return frame;
     }
 
-    /**
-     * Renderer para “iluminar” la fila donde está el mouse sin cambiar la selección real.
-     * Además, para la columna "Caducidad":
-     * - Se asume que en la BD se guarda "yyyy-MM".
-     * - Se marca con rojo fuerte si el producto ya caducó.
-     * - Se marca con rojo claro si está próximo a caducar (dentro de 30 días).
-     */
+    
     private static class HoverTableCellRenderer extends DefaultTableCellRenderer {
         private int hoveredRow = -1;
 
@@ -341,32 +333,27 @@ public class InventarioView {
 
             Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
 
-            // Columna 4 -> "Caducidad" con formato "yyyy-MM"
             if (column == 4 && value != null) {
                 try {
-                    // Parseamos como YearMonth
                     DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM");
-                    // Convertir a YearMonth
                     YearMonth cadYM = YearMonth.parse(value.toString(), formatter);
                     LocalDate primerDiaCaducidad = cadYM.atDay(1);
                     LocalDate hoy = LocalDate.now();
                     long diasRestantes = ChronoUnit.DAYS.between(hoy, primerDiaCaducidad);
 
                     if (diasRestantes < 0) {
-                        c.setBackground(new Color(255, 0, 0)); // Rojo fuerte (ya caducado)
+                        c.setBackground(new Color(255, 0, 0)); 
                     } else if (diasRestantes <= 30) {
-                        c.setBackground(new Color(255, 153, 153)); // Rojo claro (próximo a caducar)
+                        c.setBackground(new Color(255, 153, 153)); 
                     } else if (row == hoveredRow && !isSelected) {
-                        c.setBackground(new Color(220, 240, 255)); // Hover
+                        c.setBackground(new Color(220, 240, 255)); 
                     } else {
                         c.setBackground(isSelected ? table.getSelectionBackground() : table.getBackground());
                     }
                 } catch (DateTimeParseException e) {
-                    // Si no se puede parsear "yyyy-MM", se deja color normal
                     c.setBackground(isSelected ? table.getSelectionBackground() : table.getBackground());
                 }
             } else {
-                // Hover en filas para el resto de columnas
                 if (row == hoveredRow && !isSelected) {
                     c.setBackground(new Color(220, 240, 255));
                 } else {
