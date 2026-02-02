@@ -26,14 +26,12 @@ public class EditarMedicamentoView extends JDialog {
         setResizable(false);
         setLocationRelativeTo(parent);
 
-        // Panel principal con GridBagLayout
         JPanel mainPanel = new JPanel(new GridBagLayout());
         mainPanel.setBackground(new Color(240, 240, 240));
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(10, 10, 10, 10);
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
-        // Etiqueta y campo: Nombre
         gbc.gridx = 0;
         gbc.gridy = 0;
         JLabel lblNombre = new JLabel("Nombre:");
@@ -45,7 +43,6 @@ public class EditarMedicamentoView extends JDialog {
         txtNombre.setFont(new Font("Arial", Font.PLAIN, 14));
         mainPanel.add(txtNombre, gbc);
 
-        // Etiqueta y campo: Existencias (spinner)
         gbc.gridx = 0;
         gbc.gridy = 1;
         JLabel lblExistencias = new JLabel("Existencias:");
@@ -60,7 +57,6 @@ public class EditarMedicamentoView extends JDialog {
                 valorExistencias = 0;
             }
         } catch (NumberFormatException ex) {
-            // Si no es número, se queda en 0
         }
         JSpinner spinnerExistencias = new JSpinner(new SpinnerNumberModel(valorExistencias, 0, null, 1));
         JSpinner.DefaultEditor editor = (JSpinner.DefaultEditor) spinnerExistencias.getEditor();
@@ -68,7 +64,6 @@ public class EditarMedicamentoView extends JDialog {
         editor.getTextField().setFont(new Font("Arial", Font.PLAIN, 14));
         mainPanel.add(spinnerExistencias, gbc);
 
-        // Etiqueta y campo: Lote
         gbc.gridx = 0;
         gbc.gridy = 2;
         JLabel lblLote = new JLabel("Lote:");
@@ -80,14 +75,12 @@ public class EditarMedicamentoView extends JDialog {
         txtLote.setFont(new Font("Arial", Font.PLAIN, 14));
         mainPanel.add(txtLote, gbc);
 
-        // Etiqueta: Caducidad
         gbc.gridx = 0;
         gbc.gridy = 3;
         JLabel lblCaducidad = new JLabel("Caducidad (YYYY-MM):");
         lblCaducidad.setFont(new Font("Arial", Font.BOLD, 14));
         mainPanel.add(lblCaducidad, gbc);
 
-        // Panel con combos para año/mes en lugar de JDateChooser
         gbc.gridx = 1;
         JPanel cadPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
         cadPanel.setBackground(new Color(240, 240, 240));
@@ -105,7 +98,6 @@ public class EditarMedicamentoView extends JDialog {
             comboMes.addItem(m);
         }
 
-        // Si caducidadActual tiene algo, parsear "yyyy-MM" y setear combos
         if (caducidadActual != null && !caducidadActual.trim().isEmpty()) {
             try {
                 DateTimeFormatter ymFormatter = DateTimeFormatter.ofPattern("yyyy-MM");
@@ -113,7 +105,6 @@ public class EditarMedicamentoView extends JDialog {
                 comboAnio.setSelectedItem(ym.getYear());
                 comboMes.setSelectedItem(ym.getMonthValue());
             } catch (DateTimeParseException e) {
-                // Si falla, no asignamos
             }
         }
 
@@ -124,7 +115,6 @@ public class EditarMedicamentoView extends JDialog {
 
         mainPanel.add(cadPanel, gbc);
 
-        // Etiqueta y campo: Fecha de Entrada (mantiene JDateChooser con día)
         gbc.gridx = 0;
         gbc.gridy = 4;
         JLabel lblFechaEntrada = new JLabel("Fecha de Entrada (YYYY-MM-DD):");
@@ -143,24 +133,21 @@ public class EditarMedicamentoView extends JDialog {
         }
         mainPanel.add(dateChooserEntrada, gbc);
 
-        // Panel de botones
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 10));
         btnPanel.setBackground(new Color(240, 240, 240));
 
         JButton btnGuardar = createStyledButton("Guardar");
         JButton btnCancelar = createStyledButton("Cancelar");
-        btnCancelar.setBackground(new Color(211, 47, 47)); // Rojo
+        btnCancelar.setBackground(new Color(211, 47, 47));
 
         btnCancelar.addActionListener(e -> dispose());
 
-        // Acción de guardar
         btnGuardar.addActionListener(e -> {
             String nuevoNombre = txtNombre.getText().trim();
             Object spinnerValueObj = spinnerExistencias.getValue();
             String nuevasExistencias = spinnerValueObj != null ? spinnerValueObj.toString() : "0";
             String nuevoLote = txtLote.getText().trim();
 
-            // Caducidad
             Integer anioSel = (Integer) comboAnio.getSelectedItem();
             Integer mesSel = (Integer) comboMes.getSelectedItem();
             if (anioSel == null || mesSel == null) {
@@ -169,7 +156,6 @@ public class EditarMedicamentoView extends JDialog {
             }
             String nuevaCaducidad = String.format("%04d-%02d", anioSel, mesSel);
 
-            // Fecha de Entrada
             Date selectedDateEnt = dateChooserEntrada.getDate();
             if (selectedDateEnt == null) {
                 JOptionPane.showMessageDialog(this, "Fecha de entrada NO válida.", "Error", JOptionPane.ERROR_MESSAGE);
@@ -177,14 +163,12 @@ public class EditarMedicamentoView extends JDialog {
             }
             String nuevaFechaEntrada = new SimpleDateFormat("yyyy-MM-dd").format(selectedDateEnt);
 
-            // Verificar campos obligatorios
             if (nuevoNombre.isEmpty() || nuevasExistencias.isEmpty() || nuevoLote.isEmpty()
                     || nuevaCaducidad.isEmpty() || nuevaFechaEntrada.isEmpty()) {
                 JOptionPane.showMessageDialog(this, "Todos los campos son obligatorios.", "Error", JOptionPane.ERROR_MESSAGE);
                 return;
             }
 
-            // Llamar al método de edición (el controlador recarga la vista)
             if (controller.editarProducto(id, nuevoNombre, nuevasExistencias, nuevoLote, nuevaCaducidad, nuevaFechaEntrada)) {
                 JOptionPane.showMessageDialog(parent, "Medicamento actualizado con éxito.");
                 dispose();

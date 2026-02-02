@@ -31,31 +31,26 @@ public class EditarApartadoView extends JDialog {
         gbc.insets = new Insets(10, 10, 10, 10);
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
-        // Etiqueta: Fecha de Apartado (YYYY-MM-DD)
         gbc.gridx = 0;
         gbc.gridy = 0;
         JLabel lblFecha = new JLabel("Fecha de Apartado (YYYY-MM-DD):");
         lblFecha.setFont(new Font("Arial", Font.BOLD, 14));
         panel.add(lblFecha, gbc);
 
-        // JDateChooser para día/mes/año
         gbc.gridx = 1;
         dateChooserApartado = new JDateChooser();
         dateChooserApartado.setDateFormatString("yyyy-MM-dd");
         dateChooserApartado.setFont(new Font("Arial", Font.PLAIN, 14));
 
-        // Si fechaApartadoActual no está vacía, tratar de parsearla y asignarla al dateChooser
         try {
             if (fechaApartadoActual != null && !fechaApartadoActual.trim().isEmpty()) {
                 Date date = new SimpleDateFormat("yyyy-MM-dd").parse(fechaApartadoActual);
                 dateChooserApartado.setDate(date);
             }
         } catch (Exception e) {
-            // Si falla, no asignamos nada
         }
         panel.add(dateChooserApartado, gbc);
 
-        // Panel de botones
         JPanel btnPanel = new JPanel(new FlowLayout());
         btnPanel.setBackground(new Color(240, 240, 240));
 
@@ -94,16 +89,13 @@ public class EditarApartadoView extends JDialog {
     }
 
     private void guardarEdicion() {
-        // Obtener la fecha del JDateChooser
         Date date = dateChooserApartado.getDate();
         if (date == null) {
             JOptionPane.showMessageDialog(this, "La fecha de apartado es obligatoria.", "Error", JOptionPane.ERROR_MESSAGE);
             return;
         }
-        // Convertir a cadena "yyyy-MM-dd"
         String nuevaFechaApartado = new SimpleDateFormat("yyyy-MM-dd").format(date);
 
-        // Llamar al método del controlador para actualizar la fecha de apartado
         if (controller.editarApartado(productoId, nuevaFechaApartado)) {
             JOptionPane.showMessageDialog(this, "Apartado actualizado exitosamente.");
             parentView.actualizarTabla();
@@ -113,7 +105,6 @@ public class EditarApartadoView extends JDialog {
         }
     }
 
-    // Método para agregar efecto hover a los botones (similar a otras vistas)
     private void addHoverEffect(final JButton button) {
         final Color normalBg = button.getBackground();
         final Color hoverBg = normalBg.brighter();
