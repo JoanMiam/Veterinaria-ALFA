@@ -10,7 +10,7 @@ assignees: JoanMiam
 ### SECCIÓN I: SOLICITUD DE MODIFICACIÓN (MR)
 
 **Nombre del Solicitante:** [Escribir nombre]
-**Sistema:** Duran
+**Sistema:** ALFA-INVENTORY
 **Fecha de recepción:** {{ date }}
 
 **Descripción de la acción preventiva:**
