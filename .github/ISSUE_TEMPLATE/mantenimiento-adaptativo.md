@@ -7,20 +7,42 @@ assignees: JoanMiam
 
 ---
 
-### SECCIÓN I: SOLICITUD DE MODIFICACIÓN (MR)
+### 📝 SECCIÓN I: SOLICITUD DE MODIFICACIÓN (MR)
+*Instrucciones: Esta sección debe ser completada por el Solicitante (Cliente o Integrante que detecta la necesidad).*
 
-**Nombre del Solicitante:** [Escribir nombre]
-**Sistema:** ALFA-INVENTORY
-**Fecha de recepción:** {{ date }}
+**👤 Nombre del Solicitante:** [Escribir nombre completo]
 
-**Descripción del cambio de entorno:**
-> Describir el cambio necesario (ej. nueva versión de PHP, cambio de servidor, etc.)
+**💻 Sistema:** ALFA-INVENTORY
 
-**Prioridad (Elegir un número):**
-* *1*: Evita actividad esencial o pone en peligro la seguridad.
-* *2*: Afecta actividad esencial y no hay solución temporal.
-* *3*: Afecta actividad esencial pero existe solución temporal.
-* *4*: Molestia al usuario pero no impide responsabilidades.
-* *5*: Cualquier otro efecto menor.
+**📅 Fecha de recepción:** [Día / Mes / Año]
 
-**Tipo de Mantenimiento:** Adaptativo
+**📖 Descripción del cambio / problema:**
+> [Describa aquí de forma clara y detallada el fallo detectado o la mejora necesaria para evitar ambigüedades en el análisis técnico]
+
+**📊 Prioridad Sugerida (1-5):** [ ] 1 - Crítica (Bloqueo total / Seguridad)
+[ ] 2 - Alta (Afecta operación esencial sin alternativa)
+[ ] 3 - Media (Afecta operación esencial con alternativa manual)
+[ ] 4 - Baja (Molestia funcional menor)
+[ ] 5 - Menor (Mejora estética o planificada)
+
+**🛠️ Tipo de Mantenimiento Sugerido:**
+[ ] Adaptativo
+[ ] Correctivo
+[ ] Perfectivo
+[ ] Preventivo
+
+---
+
+### 🛡️ SECCIÓN II: CONTROL DE GESTIÓN (Uso exclusivo de OniriCode)
+*Nota: Esta sección será completada únicamente por el Líder de Mantenimiento (César) tras la validación de la Fase 1.*
+
+**🆔 ID del MR:** MR-# 
+*(El Líder editará este campo con el número de Issue asignado por GitHub)*
+
+**✅ Estado de Validación:**
+[ ] Aceptado (Listo para Fase 2: Análisis)
+[ ] Rechazado (Motivo: ______________________)
+
+**⚖️ Prioridad Definitiva:** [1 / 2 / 3 / 4 / 5]
+
+**👤 Mantenedor Responsable:** [Nombre del integrante asignado]
