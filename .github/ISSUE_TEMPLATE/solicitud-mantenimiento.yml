@@ -1,0 +1,123 @@
+name: 🛠️ Solicitud de Mantenimiento (MR)
+description: Formulario oficial para solicitudes de modificación del sistema ALFA-INVENTORY.
+title: "[MR]: "
+labels: ["mantenimiento", "alfa-inventory"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## SECCIÓN I: SOLICITUD DE MODIFICACIÓN (MR)
+        *Instrucciones: Esta sección debe ser completada por el Solicitante (Cliente o Integrante que detecta la necesidad).*
+
+  - type: input
+    id: solicitante
+    attributes:
+      label: "Nombre del Solicitante"
+      placeholder: "[Escribir nombre completo]"
+    validations:
+      required: true
+
+  - type: input
+    id: sistema
+    attributes:
+      label: "Sistema"
+      value: "ALFA-INVENTORY"
+      description: "Sistema afectado por la solicitud."
+    validations:
+      required: true
+
+  - type: input
+    id: fecha_recepcion
+    attributes:
+      label: "Fecha de recepción"
+      placeholder: "DD / MM / AAAA"
+    validations:
+      required: true
+
+  - type: textarea
+    id: descripcion_cambio
+    attributes:
+      label: "Descripción del cambio / problema"
+      description: "Describa aquí de forma clara y detallada el fallo detectado o la mejora necesaria."
+      placeholder: "Detalle el problema para evitar ambigüedades en el análisis técnico..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: prioridad_sugerida
+    attributes:
+      label: "Prioridad Sugerida (1-5)"
+      options:
+        - "1 - Crítica (Bloqueo total / Seguridad)"
+        - "2 - Alta (Afecta operación esencial sin alternativa)"
+        - "3 - Media (Afecta operación esencial con alternativa manual)"
+        - "4 - Baja (Molestia funcional menor)"
+        - "5 - Menor (Mejora estética o planificada)"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: tipo_mantenimiento
+    attributes:
+      label: "Tipo de Mantenimiento Sugerido"
+      options:
+        - label: "Adaptativo"
+        - label: "Correctivo"
+        - label: "Perfectivo"
+        - label: "Preventivo"
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        ## SECCIÓN II: CONTROL DE GESTIÓN (Uso exclusivo del Equipo de desarrollo)
+        *Nota: Esta sección será completada únicamente por el Líder de Mantenimiento (César) tras la validación de la Fase 1.*
+
+  - type: input
+    id: id_mr
+    attributes:
+      label: "ID del MR"
+      description: "El Líder editará este campo con el número de Issue asignado por GitHub."
+      placeholder: "MR-#"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: estado_validacion
+    attributes:
+      label: "Estado de Validación"
+      options:
+        - "Aceptado (Listo para Fase 2: Análisis)"
+        - "Rechazado"
+    validations:
+      required: false
+
+  - type: input
+    id: motivo_rechazo
+    attributes:
+      label: "Motivo de Rechazo (si aplica)"
+      placeholder: "Escriba el motivo aquí..."
+    validations:
+      required: false
+
+  - type: dropdown
+    id: prioridad_definitiva
+    attributes:
+      label: "Prioridad Definitiva"
+      options:
+        - "1"
+        - "2"
+        - "3"
+        - "4"
+        - "5"
+    validations:
+      required: false
+
+  - type: input
+    id: mantenedor_responsable
+    attributes:
+      label: "Mantenedor Responsable"
+      description: "Nombre del integrante asignado."
+      placeholder: "@usuario o Nombre"
+    validations:
+      required: false
