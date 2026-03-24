@@ -1,123 +1,149 @@
-name: 🛠️ Solicitud de Mantenimiento (MR)
-description: Formulario oficial para solicitudes de modificación del sistema ALFA-INVENTORY.
+name: 🛠️ Solicitud de Modificación (MR)
+description: Formulario técnico oficial para mantenimiento de ALFA-INVENTORY.
 title: "[MR]: "
 labels: ["mantenimiento", "alfa-inventory"]
 body:
   - type: markdown
     attributes:
       value: |
-        ## SECCIÓN I: SOLICITUD DE MODIFICACIÓN (MR)
-        *Instrucciones: Esta sección debe ser completada por el Solicitante (Cliente o Integrante que detecta la necesidad).*
+        # SOLICITUD DE MODIFICACIÓN
+        ---
+        ## Sección I
+        *Completar por el solicitante.*
 
   - type: input
-    id: solicitante
+    id: nombre_solicitante
     attributes:
-      label: "Nombre del Solicitante"
-      placeholder: "[Escribir nombre completo]"
-    validations:
-      required: true
-
-  - type: input
-    id: sistema
-    attributes:
-      label: "Sistema"
-      value: "ALFA-INVENTORY"
-      description: "Sistema afectado por la solicitud."
+      label: "Nombre del solicitante:"
     validations:
       required: true
 
   - type: input
     id: fecha_recepcion
     attributes:
-      label: "Fecha de recepción"
-      placeholder: "DD / MM / AAAA"
+      label: "Fecha de recepción:"
+      placeholder: "DD/MM/AAAA"
+    validations:
+      required: true
+
+  - type: input
+    id: sistema
+    attributes:
+      label: "Sistema:"
+      value: "ALFA-INVENTORY"
+    validations:
+      required: true
+
+  - type: input
+    id: creador
+    attributes:
+      label: "Creador:"
+      description: "Persona que registra formalmente la solicitud."
     validations:
       required: true
 
   - type: textarea
-    id: descripcion_cambio
+    id: descripcion_problema
     attributes:
-      label: "Descripción del cambio / problema"
-      description: "Describa aquí de forma clara y detallada el fallo detectado o la mejora necesaria."
-      placeholder: "Detalle el problema para evitar ambigüedades en el análisis técnico..."
+      label: "Descripción del problema"
     validations:
       required: true
 
   - type: dropdown
-    id: prioridad_sugerida
+    id: prioridad_seccion_1
     attributes:
-      label: "Prioridad Sugerida (1-5)"
-      options:
-        - "1 - Crítica (Bloqueo total / Seguridad)"
-        - "2 - Alta (Afecta operación esencial sin alternativa)"
-        - "3 - Media (Afecta operación esencial con alternativa manual)"
-        - "4 - Baja (Molestia funcional menor)"
-        - "5 - Menor (Mejora estética o planificada)"
+      label: "Prioridad"
+      options: ["1", "2", "3", "4", "5"]
     validations:
       required: true
-
-  - type: checkboxes
-    id: tipo_mantenimiento
-    attributes:
-      label: "Tipo de Mantenimiento Sugerido"
-      options:
-        - label: "Adaptativo"
-        - label: "Correctivo"
-        - label: "Perfectivo"
-        - label: "Preventivo"
 
   - type: markdown
     attributes:
       value: |
         ---
-        ## SECCIÓN II: CONTROL DE GESTIÓN (Uso exclusivo del Equipo de desarrollo)
-        *Nota: Esta sección será completada únicamente por el Líder de Mantenimiento (César) tras la validación de la Fase 1.*
+        ## Sección II
+        *Uso exclusivo del equipo técnico.*
 
   - type: input
-    id: id_mr
+    id: numero_mr
     attributes:
-      label: "ID del MR"
-      description: "El Líder editará este campo con el número de Issue asignado por GitHub."
-      placeholder: "MR-#"
+      label: "Número de MR:"
+    validations:
+      required: false
+
+  - type: input
+    id: mantenedor
+    attributes:
+      label: "Mantenedor:"
+      placeholder: "Nombre del responsable asignado"
     validations:
       required: false
 
   - type: dropdown
-    id: estado_validacion
+    id: prioridad_final
     attributes:
-      label: "Estado de Validación"
+      label: "Prioridad (Técnica):"
+      options: ["1", "2", "3", "4", "5"]
+    validations:
+      required: false
+
+  - type: dropdown
+    id: tipo_mantenimiento
+    attributes:
+      label: "Tipo de mantenimiento:"
       options:
-        - "Aceptado (Listo para Fase 2: Análisis)"
+        - "Adaptativo"
+        - "Correctivo"
+        - "Perfectivo"
+        - "Preventivo"
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        ## Sección III
+        *Control de estado y cierre.*
+
+  - type: input
+    id: id_opcion
+    attributes:
+      label: "Id opción:"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: estado_mr
+    attributes:
+      label: "Estado del MR"
+      options:
+        - "Pendiente"
+        - "En Análisis"
+        - "Aprobado"
         - "Rechazado"
+        - "Finalizado"
     validations:
       required: false
 
   - type: input
-    id: motivo_rechazo
+    id: fecha_seccion_3
     attributes:
-      label: "Motivo de Rechazo (si aplica)"
-      placeholder: "Escriba el motivo aquí..."
+      label: "Fecha:"
+      placeholder: "DD/MM/AAAA"
     validations:
       required: false
 
-  - type: dropdown
-    id: prioridad_definitiva
+  - type: textarea
+    id: resultados_analisis
     attributes:
-      label: "Prioridad Definitiva"
-      options:
-        - "1"
-        - "2"
-        - "3"
-        - "4"
-        - "5"
+      label: "Resultados del análisis:"
     validations:
       required: false
 
   - type: input
-    id: mantenedor_responsable
+    id: aprobado_por
     attributes:
-      label: "Mantenedor Responsable"
-      description: "Nombre del integrante asignado."
-      placeholder: "@usuario o Nombre"
+      label: "Aprobado por:"
     validations:
       required: false
