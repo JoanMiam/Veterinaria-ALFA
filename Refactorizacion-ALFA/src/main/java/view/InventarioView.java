@@ -368,7 +368,7 @@ public class InventarioView {
      * - Se marca con rojo fuerte si el producto ya caducó.
      * - Se marca con rojo claro si está próximo a caducar (dentro de 30 días).
      */
-    private static class HoverTableCellRenderer extends DefaultTableCellRenderer {
+    static class HoverTableCellRenderer extends DefaultTableCellRenderer {
         private int hoveredRow = -1;
         private boolean mostrarColores = true;
 
