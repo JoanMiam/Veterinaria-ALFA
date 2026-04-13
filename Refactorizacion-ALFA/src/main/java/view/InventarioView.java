@@ -1,10 +1,16 @@
 package view;
 
-import controller.InventarioController;
-import javax.swing.*;
-import javax.swing.table.*;
-import java.awt.*;
-import java.awt.event.*;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Cursor;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseMotionAdapter;
 import java.io.File;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -12,6 +18,26 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JFileChooser;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
+import javax.swing.JTextField;
+import javax.swing.JToggleButton;
+import javax.swing.ListSelectionModel;
+import javax.swing.RowFilter;
+import javax.swing.SwingUtilities;
+import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableRowSorter;
+
+import controller.InventarioController;
 
 public class InventarioView {
     private JFrame frame;
@@ -106,6 +132,21 @@ public class InventarioView {
         leftPanel.add(btnBuscar);
 
         JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JToggleButton btnToggleColores = new JToggleButton("Colores caducidad: ON");
+        btnToggleColores.setSelected(true);
+        btnToggleColores.setFont(new Font("Arial", Font.BOLD, 14));
+        btnToggleColores.setFocusPainted(false);
+        btnToggleColores.setBackground(new Color(30, 136, 229));
+        btnToggleColores.setForeground(Color.WHITE);
+        btnToggleColores.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
+        btnToggleColores.addActionListener(e -> {
+            boolean activo = btnToggleColores.isSelected();
+            btnToggleColores.setText(activo ? "Colores caducidad: ON" : "Colores caducidad: OFF");
+            btnToggleColores.setBackground(activo ? new Color(30, 136, 229) : new Color(100, 100, 100));
+            hoverRenderer.setMostrarColores(activo);
+            table.repaint();
+        });
+        rightPanel.add(btnToggleColores);
         JButton btnRefrescar = createButton("Refrescar", "");
         addHoverEffect(btnRefrescar);
         rightPanel.add(btnRefrescar);
@@ -329,9 +370,14 @@ public class InventarioView {
      */
     private static class HoverTableCellRenderer extends DefaultTableCellRenderer {
         private int hoveredRow = -1;
+        private boolean mostrarColores = true;
 
         public void setHoveredRow(int row) {
             this.hoveredRow = row;
+        }
+
+        public void setMostrarColores(boolean mostrar) {
+            this.mostrarColores = mostrar;
         }
 
         @Override
@@ -352,9 +398,9 @@ public class InventarioView {
                     LocalDate hoy = LocalDate.now();
                     long diasRestantes = ChronoUnit.DAYS.between(hoy, primerDiaCaducidad);
 
-                    if (diasRestantes < 0) {
+                    if (mostrarColores &&diasRestantes < 0) {
                         c.setBackground(new Color(255, 0, 0)); // Rojo fuerte (ya caducado)
-                    } else if (diasRestantes <= 30) {
+                    } else if (mostrarColores && diasRestantes <= 30) {
                         c.setBackground(new Color(255, 153, 153)); // Rojo claro (próximo a caducar)
                     } else if (row == hoveredRow && !isSelected) {
                         c.setBackground(new Color(220, 240, 255)); // Hover
