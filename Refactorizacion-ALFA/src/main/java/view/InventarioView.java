@@ -132,6 +132,11 @@ public class InventarioView {
         leftPanel.add(btnBuscar);
 
         JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        /*
+            * Toggle para activar/desactivar colores de caducidad.
+             * Esto permite a los usuarios que prefieren una tabla sin colores (por ejemplo, por accesibilidad)
+             * desactivar esta función sin perder la funcionalidad de hover.
+        */
         JToggleButton btnToggleColores = new JToggleButton("Colores caducidad: ON");
         btnToggleColores.setSelected(true);
         btnToggleColores.setFont(new Font("Arial", Font.BOLD, 14));
@@ -376,6 +381,11 @@ public class InventarioView {
             this.hoveredRow = row;
         }
 
+        /*
+            * Permite activar o desactivar los colores de caducidad.
+             * Esto es útil para usuarios que prefieren una tabla sin colores (por ejemplo, por accesibilidad).
+             * Al desactivar los colores, la función de hover sigue funcionando normalmente.
+        */
         public void setMostrarColores(boolean mostrar) {
             this.mostrarColores = mostrar;
         }
