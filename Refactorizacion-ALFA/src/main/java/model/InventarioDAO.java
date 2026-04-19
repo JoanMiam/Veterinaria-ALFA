@@ -2,7 +2,12 @@ package model;
 
 import java.io.File;
 import java.io.FileWriter;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
@@ -10,7 +15,8 @@ import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
-import javax.swing.*;
+
+import javax.swing.JOptionPane;
 
 public class InventarioDAO {
 
@@ -628,6 +634,54 @@ public class InventarioDAO {
         }
         return -1; // Retorna -1 si no se encuentra el producto.
     }
+
+    /**
+     * [MR-002 – OPC-A] Busca un producto por ID numérico exacto o por nombre exacto.
+     *
+     * <p>Estrategia de búsqueda:
+     * <ol>
+     *   <li>Intenta parsear {@code dato} como entero; si lo logra, ejecuta
+     *       {@code SELECT id, nombre FROM productos WHERE id = ?}.</li>
+     *   <li>Si el parseo falla ({@link NumberFormatException}) o no hay resultado,
+     *       ejecuta {@code SELECT id, nombre FROM productos WHERE nombre = ?}
+     *       (coincidencia exacta, sin comodines).</li>
+     * </ol>
+     *
+     * @param dato Cadena ingresada por el usuario; puede ser un ID numérico o
+     *             el nombre exacto del medicamento.
+     * @return {@code Object[]{id, nombre}} si se encuentra el producto,
+     *         {@code null} si no existe ninguna coincidencia.
+     */
+    public Object[] buscarProductoPorIdONombre(String dato) {
+        try {
+            ensureConnection();
+            try {
+                int id = Integer.parseInt(dato.trim());
+                String sql = "SELECT id, nombre FROM productos WHERE id = ?";
+                try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+                    stmt.setInt(1, id);
+                    ResultSet rs = stmt.executeQuery();
+                    if (rs.next()) {
+                        return new Object[]{rs.getInt("id"), rs.getString("nombre")};
+                    }
+                }
+            } catch (NumberFormatException e) {
+                // El dato no es un número; buscar por nombre exacto
+            }
+            String sql = "SELECT id, nombre FROM productos WHERE nombre = ?";
+            try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+                stmt.setString(1, dato.trim());
+                ResultSet rs = stmt.executeQuery();
+                if (rs.next()) {
+                    return new Object[]{rs.getInt("id"), rs.getString("nombre")};
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
 
 
     public boolean eliminarApartado(int id) {
