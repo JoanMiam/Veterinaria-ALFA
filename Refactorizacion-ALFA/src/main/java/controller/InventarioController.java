@@ -2,6 +2,7 @@ package controller;
 
 import java.io.File;
 import java.util.List;
+
 import model.InventarioDAO;
 
 public class InventarioController {
@@ -120,6 +121,21 @@ public class InventarioController {
         return dao.obtenerProductoIdPorNombre(dato);
     }
 
+    /**
+     * [MR-002 – OPC-A] Wrapper que delega la búsqueda unificada al DAO.
+     *
+     * <p>Permite a la vista obtener el {@code id} y {@code nombre} reales de un
+     * producto ingresando únicamente un ID numérico o el nombre exacto del
+     * medicamento, sin necesidad de conocer la lógica de acceso a datos.
+     *
+     * @param dato Cadena ingresada por el usuario (ID numérico o nombre exacto).
+     * @return {@code Object[]{id, nombre}} si el producto existe,
+     *         {@code null} si no se encontró ninguna coincidencia.
+     * @see model.InventarioDAO#buscarProductoPorIdONombre(String)
+     */
+    public Object[] buscarProductoPorIdONombre(String dato) {
+        return dao.buscarProductoPorIdONombre(dato);
+    }
 
 
     public boolean eliminarApartado(int id) {
