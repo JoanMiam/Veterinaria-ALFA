@@ -4,11 +4,19 @@ import controller.InventarioController;
 import javax.swing.*;
 import java.awt.*;
 
+/**
+ * [MR-002 – OPC-A] Diálogo para registrar una venta.
+ *
+ * <p>Reemplaza los campos separados {@code txtId} y {@code txtNombre} por un
+ * único campo {@code txtBusqueda} que acepta el ID numérico o el nombre exacto
+ * del medicamento. La resolución del producto se delega al controlador.
+ */
 public class RegistrarVentaView extends JDialog {
-    private JTextField txtId, txtNombre;
+    /** [MR-002 – OPC-A] Campo unificado: acepta ID numérico o nombre exacto del medicamento. */
+    private JTextField txtBusqueda;
     private JSpinner spinnerCantidad; // Reemplaza txtCantidad
-    private InventarioController controller;
-    private VentasView parentView;
+    private final InventarioController controller;
+    private final VentasView parentView;
 
     public RegistrarVentaView(VentasView parentView, InventarioController controller) {
         super(parentView, "Agregar Venta", true);
@@ -29,28 +37,16 @@ public class RegistrarVentaView extends JDialog {
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
         // Etiqueta y campo para el ID
-        JLabel lblId = new JLabel("ID del Medicamento:");
-        lblId.setFont(new Font("Arial", Font.BOLD, 14));
+        JLabel lblBusqueda = new JLabel("ID o Nombre del Medicamento:");
+        lblBusqueda.setFont(new Font("Arial", Font.BOLD, 14));
         gbc.gridx = 0;
         gbc.gridy = 0;
-        panel.add(lblId, gbc);
+        panel.add(lblBusqueda, gbc);
 
-        txtId = new JTextField(15);
-        txtId.setFont(new Font("Arial", Font.PLAIN, 14));
+        txtBusqueda = new JTextField(15);
+        txtBusqueda.setFont(new Font("Arial", Font.PLAIN, 14));
         gbc.gridx = 1;
-        panel.add(txtId, gbc);
-
-        // Etiqueta y campo para el Nombre
-        JLabel lblNombre = new JLabel("Nombre del Medicamento:");
-        lblNombre.setFont(new Font("Arial", Font.BOLD, 14));
-        gbc.gridx = 0;
-        gbc.gridy = 1;
-        panel.add(lblNombre, gbc);
-
-        txtNombre = new JTextField(15);
-        txtNombre.setFont(new Font("Arial", Font.PLAIN, 14));
-        gbc.gridx = 1;
-        panel.add(txtNombre, gbc);
+        panel.add(txtBusqueda, gbc);
 
         // Etiqueta y campo para la Cantidad
         JLabel lblCantidad = new JLabel("Cantidad Vendida:");
@@ -102,24 +98,43 @@ public class RegistrarVentaView extends JDialog {
         return button;
     }
 
+    /**
+     * [MR-002 – OPC-A] Procesa el registro de una venta usando el campo unificado.
+     *
+     * <p>Flujo:
+     * <ol>
+     *   <li>Valida que {@code txtBusqueda} y la cantidad no estén vacíos.</li>
+     *   <li>Llama a {@link controller.InventarioController#buscarProductoPorIdONombre(String)}
+     *       con el texto ingresado.</li>
+     *   <li>Si el resultado es {@code null}, muestra un mensaje de error y
+     *       aborta sin registrar la venta.</li>
+     *   <li>Extrae {@code id} y {@code nombre} del arreglo retornado y delega
+     *       a {@link controller.InventarioController#registrarVenta(int, String, int)}.</li>
+     * </ol>
+     */
     private void registrarVenta() {
-        String idStr = txtId.getText().trim();
-        String nombre = txtNombre.getText().trim();
-        // Obtenemos el valor del spinner y lo convertimos a String
+        String busqueda = txtBusqueda.getText().trim();
         Object spinnerValue = spinnerCantidad.getValue();
         String cantidadStr = spinnerValue != null ? spinnerValue.toString() : "";
 
-        if (idStr.isEmpty() || nombre.isEmpty() || cantidadStr.isEmpty()) {
+        if (busqueda.isEmpty() || cantidadStr.isEmpty()) {
             JOptionPane.showMessageDialog(this, "Todos los campos son obligatorios.", "Error", JOptionPane.ERROR_MESSAGE);
             return;
         }
+
+        Object[] producto = controller.buscarProductoPorIdONombre(busqueda);
+        if (producto == null) {
+            JOptionPane.showMessageDialog(this,
+                "No se encontró ningún medicamento con el ID o nombre ingresado.",
+                "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
         try {
-            int id = Integer.parseInt(idStr);
+            int id = (int) producto[0];
+            String nombre = (String) producto[1];
             int cantidad = Integer.parseInt(cantidadStr);
-            if (cantidad <= 0) {
-                JOptionPane.showMessageDialog(this, "La cantidad debe ser mayor a cero.", "Error", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
+
             if (controller.registrarVenta(id, nombre, cantidad)) {
                 JOptionPane.showMessageDialog(this, "Venta registrada con éxito.");
                 parentView.actualizarTabla();
@@ -128,7 +143,7 @@ public class RegistrarVentaView extends JDialog {
                 JOptionPane.showMessageDialog(this, "Error al registrar la venta.", "Error", JOptionPane.ERROR_MESSAGE);
             }
         } catch (NumberFormatException e) {
-            JOptionPane.showMessageDialog(this, "El ID y la cantidad deben ser números válidos.", "Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "La cantidad debe ser un número válido.", "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 }
