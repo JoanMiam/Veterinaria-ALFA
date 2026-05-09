@@ -250,12 +250,30 @@ public class InventarioDAO {
         return dataList.toArray(new Object[0][0]);
     }
 
+    /**
+     * Registra una venta descontando existencias del inventario y añadiendo
+     * un registro en {@code historial_ventas}.
+     *
+     * <p>Validaciones (en orden):
+     * <ol>
+     *   <li>El producto con {@code id} debe existir.</li>
+     *   <li>{@code nombreIngresado} debe coincidir (ignorando mayúsculas) con el nombre en BD.</li>
+     *   <li>Las existencias deben ser suficientes para cubrir {@code cantidadVendida}.</li>
+     *   <li>[MR-003 OPC-A] El producto no debe estar caducado. Un producto caduca al inicio
+     *       del mes siguiente al indicado en su campo {@code caducidad} (formato yyyy-MM).</li>
+     * </ol>
+     *
+     * @param id              ID del producto a vender.
+     * @param nombreIngresado Nombre del medicamento tal como lo ingresó el usuario.
+     * @param cantidadVendida Unidades a descontar del inventario.
+     * @return {@code true} si la venta se registró exitosamente; {@code false} en caso contrario.
+     */
     public boolean registrarVenta(int id, String nombreIngresado, int cantidadVendida) {
         try {
             ensureConnection();
 
             // Consulta el producto por su ID
-            String selectQuery = "SELECT nombre, existencias FROM productos WHERE id = ?";
+            String selectQuery = "SELECT nombre, existencias, caducidad FROM productos WHERE id = ?";
             try (PreparedStatement selectStmt = connection.prepareStatement(selectQuery)) {
                 selectStmt.setInt(1, id);
                 ResultSet rs = selectStmt.executeQuery();
@@ -268,6 +286,7 @@ public class InventarioDAO {
                 // Recupera el nombre real y el stock actual
                 String nombreReal = rs.getString("nombre");
                 int existenciasActuales = rs.getInt("existencias");
+                String caducidad = rs.getString("caducidad");
 
                 // Compara el nombre ingresado con el registrado
                 if (!nombreReal.equalsIgnoreCase(nombreIngresado)) {
@@ -277,6 +296,15 @@ public class InventarioDAO {
 
                 if (cantidadVendida > existenciasActuales) {
                     JOptionPane.showMessageDialog(null, "No hay suficientes existencias.", "Error", JOptionPane.ERROR_MESSAGE);
+                    return false;
+                }
+
+                // [MR-003 OPC-A] Validar que el producto no esté caducado.
+                // Un producto caduca al inicio del mes siguiente al indicado en caducidad.
+                YearMonth cadYM = YearMonth.parse(caducidad, DateTimeFormatter.ofPattern("yyyy-MM"));
+                LocalDate fechaExpiracion = cadYM.plusMonths(1).atDay(1);
+                if (!LocalDate.now().isBefore(fechaExpiracion)) {
+                    JOptionPane.showMessageDialog(null, "No se puede vender un producto caducado.", "Error", JOptionPane.ERROR_MESSAGE);
                     return false;
                 }
 
