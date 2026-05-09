@@ -62,21 +62,21 @@ class HoverTableCellRendererTest {
     }
 
     /**
-     * Devuelve una fecha "yyyy-MM" cuyo primer día está entre 1 y 30 días
-     * en el futuro (producto próximo a caducar).
-     * Busca en los próximos 3 meses para cubrir bordes de mes.
+     * Devuelve una fecha "yyyy-MM" cuyo primer día del mes SIGUIENTE está entre 1 y 30 días
+     * en el futuro (producto próximo a caducar según regla MR-003: expira en plusMonths(1).atDay(1)).
+     * Busca en un rango de -1 a +3 meses para cubrir bordes de mes.
      */
     private String fechaProximaCaducidad() {
         LocalDate hoy = LocalDate.now();
-        for (int i = 0; i <= 3; i++) {
+        for (int i = -1; i <= 3; i++) {
             YearMonth ym = YearMonth.now().plusMonths(i);
-            long dias = ChronoUnit.DAYS.between(hoy, ym.atDay(1));
+            long dias = ChronoUnit.DAYS.between(hoy, ym.plusMonths(1).atDay(1));
             if (dias >= 1 && dias <= 30) {
                 return ym.format(DateTimeFormatter.ofPattern("yyyy-MM"));
             }
         }
-        // Fallback: si no encuentra ninguno, usa el mes siguiente de todos modos
-        return YearMonth.now().plusMonths(1).format(DateTimeFormatter.ofPattern("yyyy-MM"));
+        // Fallback: mes actual (su expiryDate = primer día del mes siguiente)
+        return YearMonth.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
     }
 
     // -------------------------------------------------------------------------
