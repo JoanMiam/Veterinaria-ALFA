@@ -517,6 +517,17 @@ public class InventarioDAO {
 
 
 
+    /**
+     * Retorna los productos cuya fecha de expiración está dentro de los próximos
+     * {@code diasUmbral} días.
+     *
+     * <p>[MR-003 OPC-A] La fecha de expiración es el primer día del mes
+     * <em>siguiente</em> al indicado en {@code caducidad} (yyyy-MM). Así, un producto
+     * con caducidad igual al mes actual aparece como próximo a caducar (no como caducado).
+     *
+     * @param diasUmbral Número máximo de días restantes para considerar un producto próximo.
+     * @return Lista de arreglos {@code {id, nombre, existencias, lote, caducidad, fechaEntrada}}.
+     */
     public List<Object[]> obtenerMedicamentosProximosACaducar(int diasUmbral) {
         List<Object[]> proximos = new ArrayList<>();
         try (Statement stmt = connection.createStatement();
@@ -530,8 +541,8 @@ public class InventarioDAO {
                 // Parseamos a YearMonth
                 YearMonth cadYM = YearMonth.parse(caducidadStr, ymFormatter);
 
-                // Tomamos el primer día de ese mes para calcular días restantes
-                LocalDate primerDiaCaducidad = cadYM.atDay(1);
+                // [MR-003 OPC-A] Expira el primer día del mes siguiente al indicado.
+                LocalDate primerDiaCaducidad = cadYM.plusMonths(1).atDay(1);
                 long diasRestantes = ChronoUnit.DAYS.between(hoy, primerDiaCaducidad);
 
                 if (diasRestantes >= 0 && diasRestantes <= diasUmbral) {
