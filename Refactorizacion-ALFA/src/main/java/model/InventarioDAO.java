@@ -563,6 +563,15 @@ public class InventarioDAO {
 
 
 
+    /**
+     * Retorna los productos cuya fecha de expiración ya ha pasado.
+     *
+     * <p>[MR-003 OPC-A] La fecha de expiración es el primer día del mes
+     * <em>siguiente</em> al indicado en {@code caducidad} (yyyy-MM). Un producto
+     * se considera caducado cuando {@code LocalDate.now() >= cadYM.plusMonths(1).atDay(1)}.
+     *
+     * @return Lista de arreglos {@code {id, nombre, existencias, lote, caducidad, fechaEntrada}}.
+     */
     public List<Object[]> obtenerMedicamentosCaducados() {
         List<Object[]> caducados = new ArrayList<>();
         try (Statement stmt = connection.createStatement();
@@ -574,9 +583,10 @@ public class InventarioDAO {
             while (rs.next()) {
                 String caducidadStr = rs.getString("caducidad"); // "yyyy-MM"
                 YearMonth cadYM = YearMonth.parse(caducidadStr, ymFormatter);
-                LocalDate primerDiaCaducidad = cadYM.atDay(1);
+                // [MR-003 OPC-A] Expira el primer día del mes siguiente al indicado.
+                LocalDate primerDiaCaducidad = cadYM.plusMonths(1).atDay(1);
 
-                if (primerDiaCaducidad.isBefore(hoy)) {
+                if (primerDiaCaducidad.isBefore(hoy) || primerDiaCaducidad.isEqual(hoy)) {
                     int id = rs.getInt("id");
                     String nombre = rs.getString("nombre");
                     int existencias = rs.getInt("existencias");
