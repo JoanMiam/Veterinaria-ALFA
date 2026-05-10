@@ -250,12 +250,30 @@ public class InventarioDAO {
         return dataList.toArray(new Object[0][0]);
     }
 
+    /**
+     * Registra una venta descontando existencias del inventario y añadiendo
+     * un registro en {@code historial_ventas}.
+     *
+     * <p>Validaciones (en orden):
+     * <ol>
+     *   <li>El producto con {@code id} debe existir.</li>
+     *   <li>{@code nombreIngresado} debe coincidir (ignorando mayúsculas) con el nombre en BD.</li>
+     *   <li>Las existencias deben ser suficientes para cubrir {@code cantidadVendida}.</li>
+     *   <li>[MR-003 OPC-A] El producto no debe estar caducado. Un producto caduca al inicio
+     *       del mes siguiente al indicado en su campo {@code caducidad} (formato yyyy-MM).</li>
+     * </ol>
+     *
+     * @param id              ID del producto a vender.
+     * @param nombreIngresado Nombre del medicamento tal como lo ingresó el usuario.
+     * @param cantidadVendida Unidades a descontar del inventario.
+     * @return {@code true} si la venta se registró exitosamente; {@code false} en caso contrario.
+     */
     public boolean registrarVenta(int id, String nombreIngresado, int cantidadVendida) {
         try {
             ensureConnection();
 
             // Consulta el producto por su ID
-            String selectQuery = "SELECT nombre, existencias FROM productos WHERE id = ?";
+            String selectQuery = "SELECT nombre, existencias, caducidad FROM productos WHERE id = ?";
             try (PreparedStatement selectStmt = connection.prepareStatement(selectQuery)) {
                 selectStmt.setInt(1, id);
                 ResultSet rs = selectStmt.executeQuery();
@@ -268,6 +286,7 @@ public class InventarioDAO {
                 // Recupera el nombre real y el stock actual
                 String nombreReal = rs.getString("nombre");
                 int existenciasActuales = rs.getInt("existencias");
+                String caducidad = rs.getString("caducidad");
 
                 // Compara el nombre ingresado con el registrado
                 if (!nombreReal.equalsIgnoreCase(nombreIngresado)) {
@@ -277,6 +296,15 @@ public class InventarioDAO {
 
                 if (cantidadVendida > existenciasActuales) {
                     JOptionPane.showMessageDialog(null, "No hay suficientes existencias.", "Error", JOptionPane.ERROR_MESSAGE);
+                    return false;
+                }
+
+                // [MR-003 OPC-A] Validar que el producto no esté caducado.
+                // Un producto caduca al inicio del mes siguiente al indicado en caducidad.
+                YearMonth cadYM = YearMonth.parse(caducidad, DateTimeFormatter.ofPattern("yyyy-MM"));
+                LocalDate fechaExpiracion = cadYM.plusMonths(1).atDay(1);
+                if (!LocalDate.now().isBefore(fechaExpiracion)) {
+                    JOptionPane.showMessageDialog(null, "No se puede registrar la venta: el medicamento está caducado", "Error", JOptionPane.ERROR_MESSAGE);
                     return false;
                 }
 
@@ -489,6 +517,17 @@ public class InventarioDAO {
 
 
 
+    /**
+     * Retorna los productos cuya fecha de expiración está dentro de los próximos
+     * {@code diasUmbral} días.
+     *
+     * <p>[MR-003 OPC-A] La fecha de expiración es el primer día del mes
+     * <em>siguiente</em> al indicado en {@code caducidad} (yyyy-MM). Así, un producto
+     * con caducidad igual al mes actual aparece como próximo a caducar (no como caducado).
+     *
+     * @param diasUmbral Número máximo de días restantes para considerar un producto próximo.
+     * @return Lista de arreglos {@code {id, nombre, existencias, lote, caducidad, fechaEntrada}}.
+     */
     public List<Object[]> obtenerMedicamentosProximosACaducar(int diasUmbral) {
         List<Object[]> proximos = new ArrayList<>();
         try (Statement stmt = connection.createStatement();
@@ -502,8 +541,8 @@ public class InventarioDAO {
                 // Parseamos a YearMonth
                 YearMonth cadYM = YearMonth.parse(caducidadStr, ymFormatter);
 
-                // Tomamos el primer día de ese mes para calcular días restantes
-                LocalDate primerDiaCaducidad = cadYM.atDay(1);
+                // [MR-003 OPC-A] Expira el primer día del mes siguiente al indicado.
+                LocalDate primerDiaCaducidad = cadYM.plusMonths(1).atDay(1);
                 long diasRestantes = ChronoUnit.DAYS.between(hoy, primerDiaCaducidad);
 
                 if (diasRestantes >= 0 && diasRestantes <= diasUmbral) {
@@ -524,6 +563,15 @@ public class InventarioDAO {
 
 
 
+    /**
+     * Retorna los productos cuya fecha de expiración ya ha pasado.
+     *
+     * <p>[MR-003 OPC-A] La fecha de expiración es el primer día del mes
+     * <em>siguiente</em> al indicado en {@code caducidad} (yyyy-MM). Un producto
+     * se considera caducado cuando {@code LocalDate.now() >= cadYM.plusMonths(1).atDay(1)}.
+     *
+     * @return Lista de arreglos {@code {id, nombre, existencias, lote, caducidad, fechaEntrada}}.
+     */
     public List<Object[]> obtenerMedicamentosCaducados() {
         List<Object[]> caducados = new ArrayList<>();
         try (Statement stmt = connection.createStatement();
@@ -535,9 +583,10 @@ public class InventarioDAO {
             while (rs.next()) {
                 String caducidadStr = rs.getString("caducidad"); // "yyyy-MM"
                 YearMonth cadYM = YearMonth.parse(caducidadStr, ymFormatter);
-                LocalDate primerDiaCaducidad = cadYM.atDay(1);
+                // [MR-003 OPC-A] Expira el primer día del mes siguiente al indicado.
+                LocalDate primerDiaCaducidad = cadYM.plusMonths(1).atDay(1);
 
-                if (primerDiaCaducidad.isBefore(hoy)) {
+                if (primerDiaCaducidad.isBefore(hoy) || primerDiaCaducidad.isEqual(hoy)) {
                     int id = rs.getInt("id");
                     String nombre = rs.getString("nombre");
                     int existencias = rs.getInt("existencias");

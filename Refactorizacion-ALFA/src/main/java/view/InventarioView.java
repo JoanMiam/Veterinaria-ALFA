@@ -404,7 +404,8 @@ public class InventarioView {
                     DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM");
                     // Convertir a YearMonth
                     YearMonth cadYM = YearMonth.parse(value.toString(), formatter);
-                    LocalDate primerDiaCaducidad = cadYM.atDay(1);
+                    // [MR-003 OPC-A] Expira el primer día del mes siguiente al indicado.
+                    LocalDate primerDiaCaducidad = cadYM.plusMonths(1).atDay(1);
                     LocalDate hoy = LocalDate.now();
                     long diasRestantes = ChronoUnit.DAYS.between(hoy, primerDiaCaducidad);
 
