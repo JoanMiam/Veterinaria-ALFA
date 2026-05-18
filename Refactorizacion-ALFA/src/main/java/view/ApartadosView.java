@@ -1,16 +1,36 @@
 package view;
 
-import controller.InventarioController;
-import javax.swing.*;
-import javax.swing.table.*;
-import java.awt.*;
-import java.awt.event.*;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Cursor;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseMotionAdapter;
 import java.io.File;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JDialog;
+import javax.swing.JFileChooser;
+import javax.swing.JFrame;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
+import javax.swing.ListSelectionModel;
+import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableRowSorter;
+
+import controller.InventarioController;
 
 public class ApartadosView extends JDialog {
     private InventarioController controller;
@@ -301,14 +321,14 @@ public class ApartadosView extends JDialog {
                     DateTimeFormatter ymFormatter = DateTimeFormatter.ofPattern("yyyy-MM");
                     YearMonth cadYM = YearMonth.parse(value.toString(), ymFormatter);
 
-                    // Tomamos el primer día de ese mes
-                    LocalDate primerDiaCaducidad = cadYM.atDay(1);
+                    YearMonth hoyYM = YearMonth.now();
                     LocalDate hoy = LocalDate.now();
-                    long diasRestantes = ChronoUnit.DAYS.between(hoy, primerDiaCaducidad);
+                    LocalDate expiryDate = cadYM.plusMonths(1).atDay(1);
+                    long diasHastaExpiry = ChronoUnit.DAYS.between(hoy, expiryDate);
 
-                    if (diasRestantes < 0) {
+                    if (hoyYM.isAfter(cadYM)) {
                         c.setBackground(new Color(255, 0, 0)); // Rojo fuerte (ya caducado)
-                    } else if (diasRestantes <= 30) {
+                    } else if (diasHastaExpiry <= 30) {
                         c.setBackground(new Color(255, 153, 153)); // Rojo claro (próximo a caducar)
                     } else if (row == hoveredRow && !isSelected) {
                         c.setBackground(new Color(220, 240, 255)); // Hover
