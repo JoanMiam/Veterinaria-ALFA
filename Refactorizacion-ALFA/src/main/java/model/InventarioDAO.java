@@ -602,14 +602,56 @@ public class InventarioDAO {
     }
 
 
+    /**
+     * Determina si un medicamento está caducado.
+     * Un medicamento se considera caducado únicamente cuando su mes de caducidad ya pasó
+     * (es decir, el mes y año actuales son posteriores al mes de caducidad registrado).
+     *
+     * @param cad mes de caducidad del medicamento en formato YearMonth
+     * @return {@code true} si el mes actual es posterior al mes de caducidad; {@code false} en caso contrario
+     */
+    private boolean estaCaducado(YearMonth cad) {
+        return YearMonth.now().isAfter(cad);
+    }
 
-
-
+    /**
+     * Registra el apartado de un producto en la base de datos.
+     * Antes de ejecutar el UPDATE, valida que el producto no esté caducado y que tenga
+     * existencias disponibles. Si alguna validación falla, muestra un mensaje de error
+     * mediante JOptionPane y retorna {@code false} sin modificar la base de datos.
+     *
+     * @param id           identificador del producto a apartar
+     * @param fechaSeparado fecha en que se registra el apartado (formato "yyyy-MM-dd")
+     * @return {@code true} si el apartado se registró correctamente; {@code false} si el producto
+     *         está caducado, no tiene existencias, no existe o ocurre un error de base de datos
+     */
     public boolean separarProducto(int id, String fechaSeparado) {
         try {
             ensureConnection();
-            String sql = "UPDATE productos SET fecha_separado = ? WHERE id = ?";
-            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            String selectSql = "SELECT nombre, caducidad, existencias FROM productos WHERE id = ?";
+            try (PreparedStatement selectStmt = connection.prepareStatement(selectSql)) {
+                selectStmt.setInt(1, id);
+                try (ResultSet rs = selectStmt.executeQuery()) {
+                    if (!rs.next()) return false;
+                    String caducidadStr = rs.getString("caducidad");
+                    int existencias = rs.getInt("existencias");
+                    YearMonth caducidad = YearMonth.parse(caducidadStr, DateTimeFormatter.ofPattern("yyyy-MM"));
+                    if (estaCaducado(caducidad)) {
+                        JOptionPane.showMessageDialog(null,
+                            "No se puede registrar el apartado: el medicamento está caducado",
+                            "Error", JOptionPane.ERROR_MESSAGE);
+                        return false;
+                    }
+                    if (existencias <= 0) {
+                        JOptionPane.showMessageDialog(null,
+                            "No se puede registrar el apartado: el medicamento no tiene existencias disponibles",
+                            "Error", JOptionPane.ERROR_MESSAGE);
+                        return false;
+                    }
+                }
+            }
+            String updateSql = "UPDATE productos SET fecha_separado = ? WHERE id = ?";
+            try (PreparedStatement pstmt = connection.prepareStatement(updateSql)) {
                 pstmt.setString(1, fechaSeparado);
                 pstmt.setInt(2, id);
                 int filasAfectadas = pstmt.executeUpdate();
