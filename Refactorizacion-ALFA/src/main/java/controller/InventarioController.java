@@ -144,6 +144,10 @@ public class InventarioController {
         return dao.obtenerConfiguracion();
     }
 
+    public int obtenerProductoIdPorNombre(String dato) {
+        return dao.obtenerProductoIdPorNombre(dato);
+    }
+
     /**
      * [MR-002 – OPC-A] Wrapper que delega la búsqueda unificada al DAO.
      *
