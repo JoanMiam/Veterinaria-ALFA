@@ -122,9 +122,9 @@ public class ApartadosView extends JDialog {
         btnRefrescar.addActionListener(e -> cargarDatos());
         // [MR-005 – OPC-A] Exporta apartados como HTML en lugar de CSV
         btnExportar.addActionListener(e -> {
+            JFileChooser fileChooser = new JFileChooser();
             fileChooser.setDialogTitle("Guardar Reporte HTML de Apartados");
             fileChooser.setSelectedFile(new File("apartados.html"));
-            fileChooser.setSelectedFile(new File("apartados.csv"));
             int selection = fileChooser.showSaveDialog(this);
             if (selection == JFileChooser.APPROVE_OPTION) {
                 File file = fileChooser.getSelectedFile();
