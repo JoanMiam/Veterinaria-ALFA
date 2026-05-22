@@ -89,9 +89,115 @@ public class InventarioDAO {
                     "cantidad INTEGER, " +
                     "fechaVenta TEXT, " +
                     "FOREIGN KEY (idProducto) REFERENCES productos(id) ON DELETE CASCADE)");
+            stmt.execute("CREATE TABLE IF NOT EXISTS configuracion_veterinaria (" +
+                    "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                    "logo TEXT, " +
+                    "nombre TEXT, " +
+                    "direccion TEXT, " +
+                    "telefono TEXT, " +
+                    "rfc TEXT, " +
+                    "horarios TEXT)");
         } catch (SQLException e) {
             e.printStackTrace();
         }
+    }
+
+    /**
+     * [MR-005 – OPC-A] Persiste la configuración de la veterinaria en la tabla
+     * {@code configuracion_veterinaria} usando {@code INSERT OR REPLACE} con {@code id = 1},
+     * de modo que siempre exista como máximo un registro de configuración.
+     *
+     * @param logo      Imagen del logotipo codificada en Base64 (puede ser {@code null}).
+     * @param nombre    Nombre de la clínica veterinaria.
+     * @param direccion Dirección física de la clínica.
+     * @param telefono  Teléfono de contacto.
+     * @param rfc       RFC de la clínica.
+     * @param horarios  Descripción de los horarios de atención.
+     */
+    public void guardarConfiguracion(String logo, String nombre, String direccion,
+                                     String telefono, String rfc, String horarios) {
+        String sql = "INSERT OR REPLACE INTO configuracion_veterinaria (id, logo, nombre, direccion, telefono, rfc, horarios) VALUES (1, ?, ?, ?, ?, ?, ?)";
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setString(1, logo);
+            stmt.setString(2, nombre);
+            stmt.setString(3, direccion);
+            stmt.setString(4, telefono);
+            stmt.setString(5, rfc);
+            stmt.setString(6, horarios);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Error al guardar configuración: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    /**
+     * [MR-005 – OPC-A] Recupera la configuración de la veterinaria almacenada en
+     * {@code configuracion_veterinaria}.
+     *
+     * @return Arreglo {@code Object[]{logo, nombre, direccion, telefono, rfc, horarios}}
+     *         donde {@code logo} puede ser {@code null} si no se cargó imagen.
+     *         Retorna {@code null} si no existe ningún registro de configuración.
+     */
+    public Object[] obtenerConfiguracion() {
+        String sql = "SELECT logo, nombre, direccion, telefono, rfc, horarios FROM configuracion_veterinaria LIMIT 1";
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            if (rs.next()) {
+                return new Object[]{
+                        rs.getString("logo"),
+                        rs.getString("nombre"),
+                        rs.getString("direccion"),
+                        rs.getString("telefono"),
+                        rs.getString("rfc"),
+                        rs.getString("horarios")
+                };
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    /**
+     * [MR-005 – OPC-A] Construye el encabezado HTML con CSS embebido que comparten
+     * los tres reportes (inventario, apartados, ventas). Si existe configuración de
+     * veterinaria, incluye el logotipo (data-URI Base64), nombre y datos de contacto
+     * antes del título del reporte.
+     *
+     * @param titulo Título del reporte que aparece en {@code <title>} y en {@code <h1>}.
+     * @return {@link StringBuilder} con el HTML desde {@code <!DOCTYPE html>} hasta
+     *         el {@code <h1>} del título, listo para agregar las filas de la tabla.
+     */
+    private StringBuilder buildHtmlHeader(String titulo) {
+        StringBuilder html = new StringBuilder();
+        html.append("<!DOCTYPE html><html lang=\"es\"><head><meta charset=\"UTF-8\">")
+            .append("<title>").append(titulo).append("</title>")
+            .append("<style>")
+            .append("body{font-family:Arial,sans-serif;font-size:13px;margin:40px 60px;color:#000;}")
+            .append("h1{text-align:center;font-size:18px;font-weight:bold;margin-bottom:6px;}")
+            .append(".vet-info{text-align:center;font-size:12px;margin-bottom:20px;}")
+            .append("table{width:100%;border-collapse:collapse;}")
+            .append("th,td{border:1px solid #000;padding:6px 10px;}")
+            .append("th{background-color:#BDD7EE;font-weight:bold;text-align:center;}")
+            .append("</style></head><body>\n");
+        Object[] config = obtenerConfiguracion();
+        if (config != null && config[1] != null) {
+            if (config[0] != null && !config[0].toString().isEmpty()) {
+                html.append("<div style=\"text-align:center;margin-bottom:10px;\">")
+                    .append("<img src=\"data:image/png;base64,").append(config[0])
+                    .append("\" style=\"max-height:80px;\"/></div>\n");
+            }
+            html.append("<h1>").append(config[1]).append("</h1>\n");
+            html.append("<div class=\"vet-info\">");
+            if (config[2] != null) html.append(config[2]).append(" &nbsp;|&nbsp; ");
+            if (config[3] != null) html.append("Tel: ").append(config[3]).append(" &nbsp;|&nbsp; ");
+            if (config[4] != null) html.append("RFC: ").append(config[4]);
+            if (config[5] != null) html.append("<br/>Horarios: ").append(config[5]);
+            html.append("</div>\n");
+        }
+        html.append("<h1>").append(titulo).append("</h1>\n");
+        return html;
     }
 
 
@@ -202,21 +308,37 @@ public class InventarioDAO {
 
 
 
-    public void exportarCSV(File fileToSave) {
-        try (FileWriter writer = new FileWriter(fileToSave);
-             Statement stmt = this.connection.createStatement();
+    /**
+     * [MR-005 – OPC-A] Genera un reporte HTML del historial de ventas y lo guarda en
+     * {@code fileToSave}. Sustituye al anterior {@code exportarCSV}. El archivo resultante
+     * incluye CSS embebido y, si existe configuración de veterinaria, muestra el encabezado
+     * con logotipo y datos de la clínica.
+     *
+     * <p>Columnas del reporte: Nombre del Medicamento, Cantidad Vendida, Fecha de Venta.
+     *
+     * @param fileToSave Ruta destino del archivo {@code .html} a generar.
+     */
+    public void exportarVentasHTML(File fileToSave) {
+        try (Statement stmt = this.connection.createStatement();
              ResultSet rs = stmt.executeQuery("SELECT nombre, cantidad, fechaVenta FROM historial_ventas")) {
-            writer.append("Nombre, Cantidad Vendida, Fecha de Venta\n");
+            StringBuilder html = buildHtmlHeader("Reporte de Ventas");
+            html.append("<table><thead><tr>")
+                .append("<th>Nombre del Medicamento</th><th>Cantidad Vendida</th><th>Fecha de Venta</th>")
+                .append("</tr></thead><tbody>\n");
             while (rs.next()) {
-                writer.append(rs.getString("nombre")).append(",");
-                writer.append(String.valueOf(rs.getInt("cantidad"))).append(",");
-                writer.append(rs.getString("fechaVenta") != null ? rs.getString("fechaVenta") : "N/A").append("\n");
+                html.append("<tr><td>").append(rs.getString("nombre")).append("</td>")
+                    .append("<td>").append(rs.getInt("cantidad")).append("</td>")
+                    .append("<td>").append(rs.getString("fechaVenta") != null ? rs.getString("fechaVenta") : "N/A").append("</td></tr>\n");
             }
+            html.append("</tbody></table></body></html>");
+            try (FileWriter writer = new FileWriter(fileToSave)) {
+                writer.write(html.toString());
             writer.flush();
-            JOptionPane.showMessageDialog(null, "CSV exportado con éxito en:\n" + fileToSave.getAbsolutePath());
+            }
+            JOptionPane.showMessageDialog(null, "Reporte HTML exportado con éxito en:\n" + fileToSave.getAbsolutePath());
         } catch (Exception e) {
             e.printStackTrace();
-            JOptionPane.showMessageDialog(null, "Error al exportar CSV: " + e.getMessage());
+            JOptionPane.showMessageDialog(null, "Error al exportar reporte HTML: " + e.getMessage());
         }
     }
 
@@ -490,25 +612,38 @@ public class InventarioDAO {
 
 
 
-    public void exportarInventarioCSV(File fileToSave) {
-        try (FileWriter writer = new FileWriter(fileToSave);
-             Statement stmt = this.connection.createStatement();
+    /**
+     * [MR-005 – OPC-A] Genera un reporte HTML del inventario completo de productos y lo
+     * guarda en {@code fileToSave}. Sustituye al anterior {@code exportarInventarioCSV}.
+     * El archivo incluye CSS embebido y encabezado de veterinaria si existe configuración.
+     *
+     * <p>Columnas del reporte: ID, Nombre, Existencias, Lote, Caducidad, Fecha Entrada.
+     *
+     * @param fileToSave Ruta destino del archivo {@code .html} a generar.
+     */
+    public void exportarInventarioHTML(File fileToSave) {
+        try (Statement stmt = this.connection.createStatement();
              ResultSet rs = stmt.executeQuery("SELECT id, nombre, existencias, lote, caducidad, fechaEntrada FROM productos")) {
-
-            // Escribe la cabecera del CSV para el inventario
-            writer.append("ID,Nombre,Existencias,Lote,Caducidad,Fecha Entrada\n");
-
-            // Itera sobre cada fila y escribe los datos
+            StringBuilder html = buildHtmlHeader("Reporte de Inventario");
+            html.append("<table><thead><tr>")
+                .append("<th>ID</th><th>Nombre</th><th>Existencias</th><th>Lote</th><th>Caducidad</th><th>Fecha Entrada</th>")
+                .append("</tr></thead><tbody>\n");
             while (rs.next()) {
-                writer.append(String.valueOf(rs.getInt("id"))).append(",");
-                writer.append(rs.getString("nombre")).append(",");
-                writer.append(String.valueOf(rs.getInt("existencias"))).append(",");
-                writer.append(rs.getString("lote")).append(",");
-                writer.append(rs.getString("caducidad")).append(",");
-                writer.append(rs.getString("fechaEntrada")).append("\n");
+                html.append("<tr>")
+                    .append("<td>").append(rs.getInt("id")).append("</td>")
+                    .append("<td>").append(rs.getString("nombre")).append("</td>")
+                    .append("<td>").append(rs.getInt("existencias")).append("</td>")
+                    .append("<td>").append(rs.getString("lote")).append("</td>")
+                    .append("<td>").append(rs.getString("caducidad")).append("</td>")
+                    .append("<td>").append(rs.getString("fechaEntrada")).append("</td>")
+                    .append("</tr>\n");
             }
+            html.append("</tbody></table></body></html>");
+            try (FileWriter writer = new FileWriter(fileToSave)) {
+                writer.write(html.toString());
             writer.flush();
-            JOptionPane.showMessageDialog(null, "Inventario exportado con éxito en:\n" + fileToSave.getAbsolutePath());
+            }
+            JOptionPane.showMessageDialog(null, "Inventario HTML exportado con éxito en:\n" + fileToSave.getAbsolutePath());
         } catch (Exception e) {
             e.printStackTrace();
             JOptionPane.showMessageDialog(null, "Error al exportar el inventario: " + e.getMessage());
@@ -685,26 +820,44 @@ public class InventarioDAO {
 
 
 
-    public void exportarApartadosCSV(File fileToSave) {
-        try (FileWriter writer = new FileWriter(fileToSave);
-             Statement stmt = connection.createStatement();
+    /**
+     * [MR-005 – OPC-A] Genera un reporte HTML de los productos apartados y lo guarda en
+     * {@code fileToSave}. Sustituye al anterior {@code exportarApartadosCSV}. Solo incluye
+     * productos cuyo campo {@code fecha_separado} no sea {@code NULL} ni vacío.
+     * El archivo incluye CSS embebido y encabezado de veterinaria si existe configuración.
+     *
+     * <p>Columnas del reporte: ID, Nombre, Existencias, Lote, Caducidad, Fecha Entrada,
+     * Fecha Apartado.
+     *
+     * @param fileToSave Ruta destino del archivo {@code .html} a generar.
+     */
+    public void exportarApartadosHTML(File fileToSave) {
+        try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery("SELECT id, nombre, existencias, lote, caducidad, fechaEntrada, fecha_separado FROM productos WHERE fecha_separado IS NOT NULL AND fecha_separado <> ''")) {
-
-            writer.append("ID,Nombre,Existencias,Lote,Caducidad,Fecha Entrada,Fecha Apartado\n");
+            StringBuilder html = buildHtmlHeader("Reporte de Apartados");
+            html.append("<table><thead><tr>")
+                .append("<th>ID</th><th>Nombre</th><th>Existencias</th><th>Lote</th><th>Caducidad</th><th>Fecha Entrada</th><th>Fecha Apartado</th>")
+                .append("</tr></thead><tbody>\n");
             while (rs.next()) {
-                writer.append(String.valueOf(rs.getInt("id"))).append(",");
-                writer.append(rs.getString("nombre")).append(",");
-                writer.append(String.valueOf(rs.getInt("existencias"))).append(",");
-                writer.append(rs.getString("lote")).append(",");
-                writer.append(rs.getString("caducidad")).append(",");
-                writer.append(rs.getString("fechaEntrada")).append(",");
-                writer.append(rs.getString("fecha_separado")).append("\n");
+                html.append("<tr>")
+                    .append("<td>").append(rs.getInt("id")).append("</td>")
+                    .append("<td>").append(rs.getString("nombre")).append("</td>")
+                    .append("<td>").append(rs.getInt("existencias")).append("</td>")
+                    .append("<td>").append(rs.getString("lote")).append("</td>")
+                    .append("<td>").append(rs.getString("caducidad")).append("</td>")
+                    .append("<td>").append(rs.getString("fechaEntrada")).append("</td>")
+                    .append("<td>").append(rs.getString("fecha_separado")).append("</td>")
+                    .append("</tr>\n");
             }
+            html.append("</tbody></table></body></html>");
+            try (FileWriter writer = new FileWriter(fileToSave)) {
+                writer.write(html.toString());
             writer.flush();
-            JOptionPane.showMessageDialog(null, "CSV de Apartados exportado con éxito en:\n" + fileToSave.getAbsolutePath());
+            }
+            JOptionPane.showMessageDialog(null, "Apartados HTML exportado con éxito en:\n" + fileToSave.getAbsolutePath());
         } catch (Exception e) {
             e.printStackTrace();
-            JOptionPane.showMessageDialog(null, "Error al exportar CSV de Apartados: " + e.getMessage());
+            JOptionPane.showMessageDialog(null, "Error al exportar apartados: " + e.getMessage());
         }
     }
 
