@@ -12,12 +12,15 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionAdapter;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Properties;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -33,9 +36,13 @@ import javax.swing.JToggleButton;
 import javax.swing.ListSelectionModel;
 import javax.swing.RowFilter;
 import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableRowSorter;
+
+import com.formdev.flatlaf.FlatDarkLaf;
+import com.formdev.flatlaf.FlatLightLaf;
 
 import controller.InventarioController;
 
@@ -152,6 +159,35 @@ public class InventarioView {
             table.repaint();
         });
         rightPanel.add(btnToggleColores);
+
+        // [MR-006 – OPC-A] Botón para alternar entre tema claro y oscuro (FlatLaf)
+        String temaInicial = leerTema();
+        JToggleButton btnTema = new JToggleButton(
+                "dark".equalsIgnoreCase(temaInicial) ? "Tema: Oscuro" : "Tema: Claro");
+        btnTema.setSelected("dark".equalsIgnoreCase(temaInicial));
+        btnTema.setFont(new Font("Arial", Font.BOLD, 14));
+        btnTema.setFocusPainted(false);
+        btnTema.setBackground(new Color(30, 136, 229));
+        btnTema.setForeground(Color.WHITE);
+        btnTema.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
+        btnTema.addActionListener(e -> {
+            String nuevoTema = btnTema.isSelected() ? "dark" : "light";
+            btnTema.setText(btnTema.isSelected() ? "Tema: Oscuro" : "Tema: Claro");
+            try {
+                if (btnTema.isSelected()) {
+                    UIManager.setLookAndFeel(new FlatDarkLaf());
+                } else {
+                    UIManager.setLookAndFeel(new FlatLightLaf());
+                }
+                SwingUtilities.updateComponentTreeUI(frame);
+                frame.pack();
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+            guardarTema(nuevoTema);
+        });
+        rightPanel.add(btnTema);
+
         JButton btnRefrescar = createButton("Refrescar", "");
         addHoverEffect(btnRefrescar);
         rightPanel.add(btnRefrescar);
@@ -364,6 +400,40 @@ public class InventarioView {
 
     public JFrame getFrame() {
         return frame;
+    }
+
+    /**
+     * [MR-006 – OPC-A] Lee el valor {@code theme} de {@code config.properties}
+     * ubicado en el directorio de trabajo. Retorna {@code "light"} si el archivo
+     * no existe o la clave no está definida.
+     *
+     * @return {@code "dark"} o {@code "light"}.
+     */
+    private String leerTema() {
+        Properties props = new Properties();
+        File cfg = new File("config.properties");
+        if (cfg.exists()) {
+            try (java.io.FileInputStream fis = new java.io.FileInputStream(cfg)) {
+                props.load(fis);
+            } catch (IOException ignored) { }
+        }
+        return props.getProperty("theme", "light");
+    }
+
+    /**
+     * [MR-006 – OPC-A] Persiste la preferencia de tema en {@code config.properties}
+     * en el directorio de trabajo para que el arranque siguiente aplique el mismo tema.
+     *
+     * @param tema {@code "light"} o {@code "dark"}.
+     */
+    private void guardarTema(String tema) {
+        Properties props = new Properties();
+        props.setProperty("theme", tema);
+        try (FileOutputStream fos = new FileOutputStream("config.properties")) {
+            props.store(fos, "MR-006 – OPC-A: preferencia de tema visual");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     /**
