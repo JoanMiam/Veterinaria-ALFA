@@ -81,13 +81,14 @@ public class InventarioController {
         return dao.obtenerHistorialVentas();
     }
 
+    /** [MR-005 – OPC-A] Delega la generación del reporte HTML de ventas al DAO. */
     public void exportarCSV(File fileToSave) {
-        dao.exportarCSV(fileToSave);
+        dao.exportarVentasHTML(fileToSave);
     }
 
-
+    /** [MR-005 – OPC-A] Delega la generación del reporte HTML del inventario al DAO. */
     public void exportarInventarioCSV(File fileToSave) {
-        dao.exportarInventarioCSV(fileToSave);
+        dao.exportarInventarioHTML(fileToSave);
     }
 
 
@@ -113,8 +114,34 @@ public class InventarioController {
         return dao.obtenerProductosApartados();
     }
 
+    /** [MR-005 – OPC-A] Delega la generación del reporte HTML de apartados al DAO. */
     public void exportarApartadosCSV(File fileToSave) {
-        dao.exportarApartadosCSV(fileToSave);
+        dao.exportarApartadosHTML(fileToSave);
+    }
+
+    /**
+     * [MR-005 – OPC-A] Persiste la configuración de la veterinaria delegando al DAO.
+     *
+     * @param logo      Logotipo en Base64 (puede ser {@code null}).
+     * @param nombre    Nombre de la clínica.
+     * @param direccion Dirección física.
+     * @param telefono  Teléfono de contacto.
+     * @param rfc       RFC de la clínica.
+     * @param horarios  Horarios de atención.
+     */
+    public void guardarConfiguracion(String logo, String nombre, String direccion,
+                                     String telefono, String rfc, String horarios) {
+        dao.guardarConfiguracion(logo, nombre, direccion, telefono, rfc, horarios);
+    }
+
+    /**
+     * [MR-005 – OPC-A] Recupera la configuración de la veterinaria desde el DAO.
+     *
+     * @return Arreglo {@code {logo, nombre, direccion, telefono, rfc, horarios}} o
+     *         {@code null} si no existe configuración guardada.
+     */
+    public Object[] obtenerConfiguracion() {
+        return dao.obtenerConfiguracion();
     }
 
     public int obtenerProductoIdPorNombre(String dato) {

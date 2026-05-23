@@ -176,6 +176,9 @@ public class InventarioView {
         addHoverEffect(btnVentas);
         JButton btnApartados = createButton("Apartados", "");
         addHoverEffect(btnApartados);
+        // [MR-005 – OPC-A] Botón para abrir el módulo de personalización de la veterinaria
+        JButton btnPersonalizacion = createButton("Personalización", "");
+        addHoverEffect(btnPersonalizacion);
 
         buttonPanel.add(btnAgregar);
         buttonPanel.add(btnEliminar);
@@ -183,6 +186,7 @@ public class InventarioView {
         buttonPanel.add(btnExportar);
         buttonPanel.add(btnVentas);
         buttonPanel.add(btnApartados);
+        buttonPanel.add(btnPersonalizacion);
 
         frame.add(buttonPanel, BorderLayout.SOUTH);
 
@@ -193,6 +197,8 @@ public class InventarioView {
         btnExportar.addActionListener(e -> exportarCSV());
         btnVentas.addActionListener(e -> openVentas());
         btnApartados.addActionListener(e -> openApartados());
+        // [MR-005 – OPC-A] Abre el diálogo de personalización de la veterinaria
+        btnPersonalizacion.addActionListener(e -> new PersonalizacionView(frame, controller));
 
         txtBuscar.addKeyListener(new KeyAdapter() {
             @Override
@@ -335,10 +341,11 @@ public class InventarioView {
         );
     }
 
+    /** [MR-005 – OPC-A] Abre el selector de archivo y exporta el inventario como HTML. */
     private void exportarCSV() {
         JFileChooser fileChooser = new JFileChooser();
-        fileChooser.setDialogTitle("Guardar archivo CSV");
-        fileChooser.setSelectedFile(new File("inventario.csv"));
+        fileChooser.setDialogTitle("Guardar Reporte HTML de Inventario");
+        fileChooser.setSelectedFile(new File("inventario.html"));
         int selection = fileChooser.showSaveDialog(frame);
         if (selection == JFileChooser.APPROVE_OPTION) {
             File file = fileChooser.getSelectedFile();

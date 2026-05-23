@@ -1,16 +1,38 @@
 package view;
 
-import controller.InventarioController;
-import javax.swing.*;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Cursor;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseMotionAdapter;
+import java.io.File;
+import java.util.Arrays;
+
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JDialog;
+import javax.swing.JFileChooser;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
+import javax.swing.JTextField;
+import javax.swing.ListSelectionModel;
+import javax.swing.RowFilter;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableRowSorter;
-import java.awt.*;
-import java.awt.event.*;
-import java.io.File;
-import java.util.Arrays;
+
+import controller.InventarioController;
 
 public class VentasView extends JDialog {
     private InventarioController controller;
@@ -281,28 +303,18 @@ public class VentasView extends JDialog {
         }
     }
 
+    /**
+     * [MR-005 – OPC-A] Genera un reporte HTML del historial de ventas mostrado en la
+     * tabla y lo guarda en el archivo seleccionado por el usuario. Delega en el DAO
+     * para incluir el encabezado de clínica con logotipo.
+     */
     private void exportarReporte() {
         JFileChooser fileChooser = new JFileChooser();
-        fileChooser.setDialogTitle("Guardar Reporte de Ventas");
-        fileChooser.setSelectedFile(new File("reporte_ventas.csv"));
+        fileChooser.setDialogTitle("Guardar Reporte HTML de Ventas");
+        fileChooser.setSelectedFile(new File("reporte_ventas.html"));
         int selection = fileChooser.showSaveDialog(this);
         if (selection == JFileChooser.APPROVE_OPTION) {
-            File file = fileChooser.getSelectedFile();
-            try (java.io.FileWriter writer = new java.io.FileWriter(file)) {
-                writer.append("ID Venta, ID Producto, Nombre del Medicamento, Cantidad Vendida, Fecha de Venta\n");
-                for (int row = 0; row < model.getRowCount(); row++) {
-                    for (int col = 0; col < model.getColumnCount(); col++) {
-                        Object value = model.getValueAt(row, col);
-                        writer.append(value != null ? value.toString() : "");
-                        if (col < model.getColumnCount() - 1) writer.append(",");
-                    }
-                    writer.append("\n");
-                }
-                writer.flush();
-                JOptionPane.showMessageDialog(this, "Reporte exportado con éxito.");
-            } catch (Exception e) {
-                JOptionPane.showMessageDialog(this, "Error al exportar el reporte: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-            }
+            controller.exportarCSV(fileChooser.getSelectedFile());
         }
     }
 
