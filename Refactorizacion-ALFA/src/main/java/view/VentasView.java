@@ -305,8 +305,8 @@ public class VentasView extends JDialog {
 
     /**
      * [MR-005 – OPC-A] Genera un reporte HTML del historial de ventas mostrado en la
-     * tabla y lo guarda en el archivo seleccionado por el usuario. Sustituye la exportación
-     * CSV anterior. El HTML incluye CSS embebido para visualización directa en navegador.
+     * tabla y lo guarda en el archivo seleccionado por el usuario. Delega en el DAO
+     * para incluir el encabezado de clínica con logotipo.
      */
     private void exportarReporte() {
         JFileChooser fileChooser = new JFileChooser();
@@ -314,38 +314,7 @@ public class VentasView extends JDialog {
         fileChooser.setSelectedFile(new File("reporte_ventas.html"));
         int selection = fileChooser.showSaveDialog(this);
         if (selection == JFileChooser.APPROVE_OPTION) {
-            File file = fileChooser.getSelectedFile();
-            try (java.io.FileWriter writer = new java.io.FileWriter(file)) {
-                StringBuilder html = new StringBuilder();
-                html.append("<!DOCTYPE html><html lang=\"es\"><head><meta charset=\"UTF-8\">")
-                    .append("<title>Reporte de Ventas</title>")
-                    .append("<style>")
-                    .append("body{font-family:Arial,sans-serif;font-size:13px;margin:40px 60px;color:#000;}")
-                    .append("h1{text-align:center;font-size:18px;font-weight:bold;margin-bottom:20px;}")
-                    .append("table{width:100%;border-collapse:collapse;}")
-                    .append("th,td{border:1px solid #000;padding:6px 10px;}")
-                    .append("th{background-color:#BDD7EE;font-weight:bold;text-align:center;}")
-                    .append("</style></head><body>")
-                    .append("<h1>Reporte de Ventas</h1><table><thead><tr>");
-                for (int col = 0; col < model.getColumnCount(); col++) {
-                    html.append("<th>").append(model.getColumnName(col)).append("</th>");
-                }
-                html.append("</tr></thead><tbody>\n");
-                for (int row = 0; row < model.getRowCount(); row++) {
-                    html.append("<tr>");
-                    for (int col = 0; col < model.getColumnCount(); col++) {
-                        Object value = model.getValueAt(row, col);
-                        html.append("<td>").append(value != null ? value.toString() : "").append("</td>");
-                    }
-                    html.append("</tr>\n");
-                }
-                html.append("</tbody></table></body></html>");
-                writer.write(html.toString());
-                writer.flush();
-                JOptionPane.showMessageDialog(this, "Reporte HTML exportado con éxito.");
-            } catch (Exception e) {
-                JOptionPane.showMessageDialog(this, "Error al exportar el reporte: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-            }
+            controller.exportarCSV(fileChooser.getSelectedFile());
         }
     }
 
