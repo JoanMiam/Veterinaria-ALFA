@@ -184,8 +184,11 @@ public class InventarioDAO {
         Object[] config = obtenerConfiguracion();
         if (config != null && config[1] != null) {
             if (config[0] != null && !config[0].toString().isEmpty()) {
+                String b64 = config[0].toString();
+                // JPG base64 starts with /9j/; PNG starts with iVBOR
+                String mime = b64.startsWith("/9j/") ? "image/jpeg" : "image/png";
                 html.append("<div style=\"text-align:center;margin-bottom:10px;\">")
-                    .append("<img src=\"data:image/png;base64,").append(config[0])
+                    .append("<img src=\"data:").append(mime).append(";base64,").append(b64)
                     .append("\" style=\"max-height:80px;\"/></div>\n");
             }
             html.append("<h1>").append(config[1]).append("</h1>\n");
