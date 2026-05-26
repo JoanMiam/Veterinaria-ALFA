@@ -1,14 +1,31 @@
 package view;
 
-import com.toedter.calendar.JDateChooser;
-import controller.InventarioController;
-import javax.swing.*;
-import java.awt.*;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.util.Date;
 
-public class EditarVentaView extends JDialog {
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JDialog;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JSpinner;
+import javax.swing.JTextField;
+import javax.swing.SpinnerNumberModel;
+
+import com.toedter.calendar.JDateChooser;
+
+import controller.InventarioController;
+
+public class EditarVentaView extends FormularioConfirmableDialog {
     public EditarVentaView(JDialog parent, InventarioController controller, Object id, String nombre, String cantidad, String fecha) {
         super(parent, "Editar Venta", true);
         setResizable(false);
@@ -111,7 +128,7 @@ public class EditarVentaView extends JDialog {
         btnCancelar.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
 
         // Lógica de botones (sin cambios)
-        btnCancelar.addActionListener(e -> dispose());
+        btnCancelar.addActionListener(e -> confirmarCierre());
         btnGuardar.addActionListener(e -> {
             String nuevoNombre = txtNombre.getText().trim();
             // Obtenemos el valor del spinner en lugar de txtCantidad
@@ -184,5 +201,17 @@ public class EditarVentaView extends JDialog {
         pack();
         setLocationRelativeTo(null);
         setVisible(true);
+    }
+
+    /**
+     * [MR-007 – OPC-B] Siempre retorna {@code true} porque el formulario se
+     * abre con datos pre-cargados de la venta a editar; cualquier cierre sin
+     * guardar podría descartar cambios realizados por el usuario.
+     *
+     * @return {@code true} siempre.
+     */
+    @Override
+    protected boolean tieneDatosIngresados() {
+        return true;
     }
 }

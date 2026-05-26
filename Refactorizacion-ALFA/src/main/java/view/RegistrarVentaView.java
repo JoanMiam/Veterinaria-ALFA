@@ -1,8 +1,23 @@
 package view;
 
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
+
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JSpinner;
+import javax.swing.JTextField;
+import javax.swing.SpinnerNumberModel;
+
 import controller.InventarioController;
-import javax.swing.*;
-import java.awt.*;
 
 /**
  * [MR-002 – OPC-A] Diálogo para registrar una venta.
@@ -11,7 +26,7 @@ import java.awt.*;
  * único campo {@code txtBusqueda} que acepta el ID numérico o el nombre exacto
  * del medicamento. La resolución del producto se delega al controlador.
  */
-public class RegistrarVentaView extends JDialog {
+public class RegistrarVentaView extends FormularioConfirmableDialog {
     /** [MR-002 – OPC-A] Campo unificado: acepta ID numérico o nombre exacto del medicamento. */
     private JTextField txtBusqueda;
     private JSpinner spinnerCantidad; // Reemplaza txtCantidad
@@ -74,7 +89,7 @@ public class RegistrarVentaView extends JDialog {
         btnCancelar.setBackground(new Color(211, 47, 47)); // Rojo
 
         btnGuardar.addActionListener(e -> registrarVenta());
-        btnCancelar.addActionListener(e -> dispose());
+        btnCancelar.addActionListener(e -> confirmarCierre());
         btnPanel.add(btnGuardar);
         btnPanel.add(btnCancelar);
 
@@ -86,6 +101,17 @@ public class RegistrarVentaView extends JDialog {
         pack();
         setLocationRelativeTo(null);
         setVisible(true);
+    }
+
+    /**
+     * [MR-007 – OPC-B] Retorna {@code true} si el campo de búsqueda contiene
+     * texto, indicando que el usuario comenzó a ingresar datos de la venta.
+     *
+     * @return {@code true} si {@code txtBusqueda} no está vacío.
+     */
+    @Override
+    protected boolean tieneDatosIngresados() {
+        return !txtBusqueda.getText().trim().isEmpty();
     }
 
     private JButton createStyledButton(String text) {

@@ -11,6 +11,8 @@ import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionAdapter;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -65,7 +67,24 @@ public class InventarioView {
 
     private void initialize() {
         frame = new JFrame("Inventario Veterinaria");
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        // [MR-007 – OPC-B] Reemplaza EXIT_ON_CLOSE por DO_NOTHING_ON_CLOSE para
+        // interceptar el evento de cierre y solicitar confirmación al usuario antes de salir.
+        frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
+        frame.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                int r = JOptionPane.showConfirmDialog(
+                        frame,
+                        "¿Está seguro de cerrar el programa?",
+                        "Confirmar cierre",
+                        JOptionPane.YES_NO_OPTION,
+                        JOptionPane.WARNING_MESSAGE
+                );
+                if (r == JOptionPane.YES_OPTION) {
+                    System.exit(0);
+                }
+            }
+        });
         frame.setSize(900, 550);
         frame.setLayout(new BorderLayout());
         frame.setLocationRelativeTo(null);

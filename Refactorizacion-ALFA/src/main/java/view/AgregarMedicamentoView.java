@@ -1,11 +1,28 @@
 package view;
 
-import controller.InventarioController;
-import javax.swing.*;
-import java.awt.*;
+import java.awt.Color;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
 import java.util.Calendar;
 
-public class AgregarMedicamentoView extends JDialog {
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JComponent;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JSpinner;
+import javax.swing.JTextField;
+import javax.swing.SpinnerNumberModel;
+
+import controller.InventarioController;
+
+public class AgregarMedicamentoView extends FormularioConfirmableDialog {
     private JTextField txtNombre, txtLote;
     private JSpinner spinnerExistencias;
     // Reemplazamos el JDateChooser por dos combos:
@@ -87,7 +104,7 @@ public class AgregarMedicamentoView extends JDialog {
         JButton btnGuardar = createStyledButton("Guardar", new Color(30, 136, 229));
         JButton btnCancelar = createStyledButton("Cancelar", new Color(211, 47, 47));
         btnGuardar.addActionListener(e -> guardarMedicamento());
-        btnCancelar.addActionListener(e -> dispose());
+        btnCancelar.addActionListener(e -> confirmarCierre());
         buttonPanel.add(btnGuardar);
         buttonPanel.add(btnCancelar);
 
@@ -127,6 +144,18 @@ public class AgregarMedicamentoView extends JDialog {
         button.setFocusPainted(false);
         button.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
         return button;
+    }
+
+    /**
+     * [MR-007 – OPC-B] Retorna {@code true} si el usuario ingresó texto en
+     * el campo Nombre o en el campo Lote, indicando que hay datos que se
+     * perderían al cerrar sin guardar.
+     *
+     * @return {@code true} si {@code txtNombre} o {@code txtLote} contienen texto.
+     */
+    @Override
+    protected boolean tieneDatosIngresados() {
+        return !txtNombre.getText().trim().isEmpty() || !txtLote.getText().trim().isEmpty();
     }
 
     private void guardarMedicamento() {
