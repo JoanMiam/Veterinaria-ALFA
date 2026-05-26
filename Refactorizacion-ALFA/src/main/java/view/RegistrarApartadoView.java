@@ -110,15 +110,17 @@ public class RegistrarApartadoView extends FormularioConfirmableDialog {
     }
 
     /**
-     * [MR-007 – OPC-B] Siempre retorna {@code true} porque el formulario se
-     * abre con la fecha de apartado pre-cargada; cualquier cierre sin guardar
-     * podría descartar cambios realizados por el usuario.
+     * [MR-007 – OPC-B] Retorna {@code true} si el campo de búsqueda contiene
+     * texto, indicando que el usuario comenzó a ingresar datos del apartado.
+     * El campo {@code dateChooserApartado} no se evalúa porque {@link com.toedter.calendar.JDateChooser}
+     * puede retornar una fecha no nula por defecto aunque el usuario no haya
+     * interactuado con él, lo que provocaría falsos positivos en la detección.
      *
-     * @return {@code true} siempre.
+     * @return {@code true} si {@code txtSearch} no está vacío.
      */
     @Override
     protected boolean tieneDatosIngresados() {
-        return true;
+        return !txtSearch.getText().trim().isEmpty();
     }
 
     private void registrarApartado() {
