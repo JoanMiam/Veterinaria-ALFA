@@ -81,14 +81,18 @@ public abstract class FormularioConfirmableDialog extends JDialog {
             dispose();
             return;
         }
-        int opcion = JOptionPane.showConfirmDialog(
+        Object[] opciones = { "Sí", "No" };
+        int opcion = JOptionPane.showOptionDialog(
                 this,
                 "¿Está seguro de cerrar el formulario? Se perderán los datos ingresados.",
                 "Confirmar cierre",
                 JOptionPane.YES_NO_OPTION,
-                JOptionPane.WARNING_MESSAGE
+                JOptionPane.WARNING_MESSAGE,
+                null,
+                opciones,
+                opciones[1]
         );
-        if (opcion == JOptionPane.YES_OPTION) {
+        if (opcion == 0) {
             dispose();
         }
     }
