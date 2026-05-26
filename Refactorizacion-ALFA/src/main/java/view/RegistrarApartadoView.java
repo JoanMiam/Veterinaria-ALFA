@@ -1,15 +1,30 @@
 package view;
 
-import com.toedter.calendar.JDateChooser;
-import controller.InventarioController;
-import javax.swing.*;
-import java.awt.*;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Cursor;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
-public class RegistrarApartadoView extends JDialog {
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JTextField;
+
+import com.toedter.calendar.JDateChooser;
+
+import controller.InventarioController;
+
+public class RegistrarApartadoView extends FormularioConfirmableDialog {
     private JTextField txtSearch;
     private JDateChooser dateChooserApartado;
     private InventarioController controller;
@@ -81,7 +96,7 @@ public class RegistrarApartadoView extends JDialog {
         addHoverEffect(btnCancelar);
 
         btnGuardar.addActionListener(e -> registrarApartado());
-        btnCancelar.addActionListener(e -> dispose());
+        btnCancelar.addActionListener(e -> confirmarCierre());
 
         btnPanel.add(btnGuardar);
         btnPanel.add(btnCancelar);
@@ -92,6 +107,18 @@ public class RegistrarApartadoView extends JDialog {
         setLocationRelativeTo(parentView.getFrame());
         setResizable(false);
         setVisible(true);
+    }
+
+    /**
+     * [MR-007 – OPC-B] Siempre retorna {@code true} porque el formulario se
+     * abre con la fecha de apartado pre-cargada; cualquier cierre sin guardar
+     * podría descartar cambios realizados por el usuario.
+     *
+     * @return {@code true} siempre.
+     */
+    @Override
+    protected boolean tieneDatosIngresados() {
+        return true;
     }
 
     private void registrarApartado() {
