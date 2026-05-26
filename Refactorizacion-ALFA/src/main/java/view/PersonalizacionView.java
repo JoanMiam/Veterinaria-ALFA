@@ -17,7 +17,6 @@ import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
-import javax.swing.JDialog;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -48,7 +47,7 @@ import controller.InventarioController;
  * Al abrir el diálogo, se pre-cargan los valores existentes (si los hay) mediante
  * {@link InventarioController#obtenerConfiguracion}.
  */
-public class PersonalizacionView extends JDialog {
+public class PersonalizacionView extends FormularioConfirmableDialog {
 
     private final InventarioController controller;
 
@@ -128,11 +127,28 @@ public class PersonalizacionView extends JDialog {
         JButton btnCancelar = new JButton("Cancelar");
 
         btnGuardar.addActionListener(e -> guardar());
-        btnCancelar.addActionListener(e -> dispose());
+        btnCancelar.addActionListener(e -> confirmarCierre());
 
         btnPanel.add(btnGuardar);
         btnPanel.add(btnCancelar);
         add(btnPanel, BorderLayout.SOUTH);
+    }
+
+    /**
+     * [MR-007 – OPC-B] Retorna {@code true} si alguno de los campos de
+     * personalización (nombre, dirección, teléfono, RFC, horarios) contiene
+     * texto o si se seleccionó un logotipo, indicando datos pendientes de guardar.
+     *
+     * @return {@code true} si al menos un campo o el logo tiene valor.
+     */
+    @Override
+    protected boolean tieneDatosIngresados() {
+        return !txtNombre.getText().trim().isEmpty()
+                || !txtDireccion.getText().trim().isEmpty()
+                || !txtTelefono.getText().trim().isEmpty()
+                || !txtRfc.getText().trim().isEmpty()
+                || !txtHorarios.getText().trim().isEmpty()
+                || logoBase64 != null;
     }
 
     private void agregarFila(JPanel panel, GridBagConstraints gbc, int fila,
