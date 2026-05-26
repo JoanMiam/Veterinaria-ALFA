@@ -1,10 +1,12 @@
 package view;
 
-import com.toedter.calendar.JDateChooser;
-import controller.InventarioController;
-import javax.swing.*;
-import java.awt.*;
-import java.awt.event.*;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
 import java.text.SimpleDateFormat;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
@@ -12,7 +14,22 @@ import java.time.format.DateTimeParseException;
 import java.util.Calendar;
 import java.util.Date;
 
-public class EditarMedicamentoView extends JDialog {
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JSpinner;
+import javax.swing.JTextField;
+import javax.swing.SpinnerNumberModel;
+
+import com.toedter.calendar.JDateChooser;
+
+import controller.InventarioController;
+
+public class EditarMedicamentoView extends FormularioConfirmableDialog {
 
     public EditarMedicamentoView(JFrame parent,
                                  InventarioController controller,
@@ -151,7 +168,7 @@ public class EditarMedicamentoView extends JDialog {
         JButton btnCancelar = createStyledButton("Cancelar");
         btnCancelar.setBackground(new Color(211, 47, 47)); // Rojo
 
-        btnCancelar.addActionListener(e -> dispose());
+        btnCancelar.addActionListener(e -> confirmarCierre());
 
         // Acción de guardar
         btnGuardar.addActionListener(e -> {
@@ -203,6 +220,18 @@ public class EditarMedicamentoView extends JDialog {
         pack();
         setLocationRelativeTo(null);
         setVisible(true);
+    }
+
+    /**
+     * [MR-007 – OPC-B] Siempre retorna {@code true} porque el formulario se
+     * abre con datos pre-cargados del medicamento a editar; cualquier cierre
+     * sin guardar podría descartar cambios realizados por el usuario.
+     *
+     * @return {@code true} siempre.
+     */
+    @Override
+    protected boolean tieneDatosIngresados() {
+        return true;
     }
 
     private JButton createStyledButton(String text) {
