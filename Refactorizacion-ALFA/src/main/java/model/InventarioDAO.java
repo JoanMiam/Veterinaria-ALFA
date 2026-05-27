@@ -801,7 +801,14 @@ public class InventarioDAO {
                     if (!rs.next()) return false;
                     String caducidadStr = rs.getString("caducidad");
                     int existencias = rs.getInt("existencias");
-                    YearMonth caducidad = YearMonth.parse(caducidadStr, DateTimeFormatter.ofPattern("yyyy-MM"));
+                    // [MR-003 OPC-A] Parseo seguro: ante caducidad corrupta, no se aparta.
+                    YearMonth caducidad = parsearCaducidad(caducidadStr);
+                    if (caducidad == null) {
+                        JOptionPane.showMessageDialog(null,
+                            "No se puede registrar el apartado: la caducidad del producto no tiene un formato válido",
+                            "Error", JOptionPane.ERROR_MESSAGE);
+                        return false;
+                    }
                     if (estaCaducado(caducidad)) {
                         JOptionPane.showMessageDialog(null,
                             "No se puede registrar el apartado: el medicamento está caducado",
