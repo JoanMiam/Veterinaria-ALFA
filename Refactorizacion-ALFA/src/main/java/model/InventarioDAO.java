@@ -445,7 +445,11 @@ public class InventarioDAO {
 
                 // [MR-003 OPC-A] Validar que el producto no esté caducado.
                 // Un producto caduca al inicio del mes siguiente al indicado en caducidad.
-                YearMonth cadYM = YearMonth.parse(caducidad, DateTimeFormatter.ofPattern("yyyy-MM"));
+                YearMonth cadYM = parsearCaducidad(caducidad);
+                if (cadYM == null) {
+                    JOptionPane.showMessageDialog(null, "No se puede registrar la venta: la caducidad del producto no tiene un formato válido", "Error", JOptionPane.ERROR_MESSAGE);
+                    return false;
+                }
                 LocalDate fechaExpiracion = cadYM.plusMonths(1).atDay(1);
                 if (!LocalDate.now().isBefore(fechaExpiracion)) {
                     JOptionPane.showMessageDialog(null, "No se puede registrar la venta: el medicamento está caducado", "Error", JOptionPane.ERROR_MESSAGE);
