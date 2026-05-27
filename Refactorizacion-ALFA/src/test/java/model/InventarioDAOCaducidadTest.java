@@ -212,4 +212,94 @@ class InventarioDAOCaducidadTest {
         assertFalse(caducados.isEmpty(),
             "Producto cuyo mes de caducidad ya pasó debe aparecer en la lista de caducados");
     }
+
+    // =========================================================================
+    // TC-09 a TC-13: parseo seguro de caducidad (MR-008 OPC-A)
+    // =========================================================================
+
+    @Test
+    @DisplayName("TC-09: registrarVenta con caducidad null → no registra venta")
+    void tc09_caducidadNull_registrarVentaNoRegistra() throws SQLException {
+        int id = insertarProducto("Med-Null", 10, null);
+
+        // En entorno headless el JOptionPane lanza HeadlessException antes del return false.
+        try {
+            dao.registrarVenta(id, "Med-Null", 1);
+        } catch (Exception ignored) {
+            // HeadlessException esperada
+        }
+
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM historial_ventas")) {
+            assertTrue(rs.next());
+            assertEquals(0, rs.getInt(1),
+                "No debe existir registro en historial_ventas cuando la caducidad es null");
+        }
+    }
+
+    @Test
+    @DisplayName("TC-10: registrarVenta con caducidad vacía → no registra venta")
+    void tc10_caducidadVacia_registrarVentaNoRegistra() throws SQLException {
+        int id = insertarProducto("Med-Vacio", 10, "");
+
+        try {
+            dao.registrarVenta(id, "Med-Vacio", 1);
+        } catch (Exception ignored) {
+            // HeadlessException esperada
+        }
+
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM historial_ventas")) {
+            assertTrue(rs.next());
+            assertEquals(0, rs.getInt(1),
+                "No debe existir registro en historial_ventas cuando la caducidad es vacía");
+        }
+    }
+
+    @Test
+    @DisplayName("TC-11: registrarVenta con caducidad mal formada → no registra venta")
+    void tc11_caducidadMalFormada_registrarVentaNoRegistra() throws SQLException {
+        int id = insertarProducto("Med-Basura", 10, "2025-13");
+
+        try {
+            dao.registrarVenta(id, "Med-Basura", 1);
+        } catch (Exception ignored) {
+            // HeadlessException esperada
+        }
+
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM historial_ventas")) {
+            assertTrue(rs.next());
+            assertEquals(0, rs.getInt(1),
+                "No debe existir registro en historial_ventas cuando la caducidad está mal formada");
+        }
+    }
+
+    @Test
+    @DisplayName("TC-12: obtenerMedicamentosProximosACaducar omite fila corrupta y devuelve el resto")
+    void tc12_proximosACaducar_omiteCorruptoYDevuelveResto() throws SQLException {
+        insertarProducto("Med-Corrupto", 10, "no-es-fecha");
+        insertarProducto("Med-Valido", 10, caducidadMesActual());
+
+        var proximos = dao.obtenerMedicamentosProximosACaducar(31);
+
+        assertEquals(1, proximos.size(),
+            "Debe omitir el registro con caducidad corrupta y devolver solo el válido");
+        assertEquals("Med-Valido", proximos.get(0)[1],
+            "El registro devuelto debe corresponder al producto con caducidad válida");
+    }
+
+    @Test
+    @DisplayName("TC-13: obtenerMedicamentosCaducados omite fila corrupta y devuelve el resto")
+    void tc13_caducados_omiteCorruptoYDevuelveResto() throws SQLException {
+        insertarProducto("Med-Corrupto", 10, null);
+        insertarProducto("Med-Caducado", 10, caducidadExpirada());
+
+        var caducados = dao.obtenerMedicamentosCaducados();
+
+        assertEquals(1, caducados.size(),
+            "Debe omitir el registro con caducidad corrupta y devolver solo el caducado válido");
+        assertEquals("Med-Caducado", caducados.get(0)[1],
+            "El registro devuelto debe corresponder al producto con caducidad válida");
+    }
 }
