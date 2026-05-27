@@ -376,18 +376,7 @@ public class InventarioDAO {
     }
 
     private boolean validarFechaCaducidad(String fechaCaducidad) {
-        // Validar con expresión regular: 4 dígitos de año, guión, 2 dígitos de mes
-        if (!fechaCaducidad.matches("\\d{4}-\\d{2}")) {
-            return false;
-        }
-        // O adicionalmente intentar parsear con YearMonth
-        try {
-            DateTimeFormatter ymFormatter = DateTimeFormatter.ofPattern("yyyy-MM");
-            YearMonth.parse(fechaCaducidad, ymFormatter);
-            return true; // si parsea, es válido
-        } catch (DateTimeParseException e) {
-            return false;
-        }
+        return parsearCaducidad(fechaCaducidad) != null;
     }
 
 
