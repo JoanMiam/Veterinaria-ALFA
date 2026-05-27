@@ -740,12 +740,15 @@ public class InventarioDAO {
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery("SELECT * FROM productos")) {
 
-            DateTimeFormatter ymFormatter = DateTimeFormatter.ofPattern("yyyy-MM");
             LocalDate hoy = LocalDate.now();
 
             while (rs.next()) {
                 String caducidadStr = rs.getString("caducidad"); // "yyyy-MM"
-                YearMonth cadYM = YearMonth.parse(caducidadStr, ymFormatter);
+                // [MR-003 OPC-A] Parseo seguro: omitir registros con caducidad corrupta.
+                YearMonth cadYM = parsearCaducidad(caducidadStr);
+                if (cadYM == null) {
+                    continue;
+                }
                 // [MR-003 OPC-A] Expira el primer día del mes siguiente al indicado.
                 LocalDate primerDiaCaducidad = cadYM.plusMonths(1).atDay(1);
 
