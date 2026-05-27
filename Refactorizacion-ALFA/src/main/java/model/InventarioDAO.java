@@ -345,6 +345,36 @@ public class InventarioDAO {
         }
     }
 
+    /**
+     * Parsea y valida de forma segura la cadena de caducidad del producto.
+     * Centraliza la lógica de validación (regex {@code \d{4}-\d{2}}) y el parseo
+     * a {@link YearMonth} reutilizando lo ya implementado en {@link #validarFechaCaducidad}.
+     *
+     * <p>Diseñado para invocarse desde los 4 puntos vulnerables ({@code registrarVenta},
+     * {@code obtenerMedicamentosProximosACaducar}, {@code obtenerMedicamentosCaducados},
+     * {@code separarProducto}). Ante {@code null} debe interpretarse según el contexto:
+     * las consultas de alertas omiten el registro corrupto; las operaciones de venta/apartado
+     * retornan {@code false} con un mensaje claro al usuario.
+     *
+     * @param fechaCaducidad cadena en formato {@code yyyy-MM} (puede ser {@code null} o vacía).
+     * @return el {@link YearMonth} parseado, o {@code null} si la entrada es nula,
+     *         vacía o tiene formato inválido.
+     */
+    private YearMonth parsearCaducidad(String fechaCaducidad) {
+        if (fechaCaducidad == null || fechaCaducidad.isEmpty()) {
+            return null;
+        }
+        if (!fechaCaducidad.matches("\\d{4}-\\d{2}")) {
+            return null;
+        }
+        try {
+            DateTimeFormatter ymFormatter = DateTimeFormatter.ofPattern("yyyy-MM");
+            return YearMonth.parse(fechaCaducidad, ymFormatter);
+        } catch (DateTimeParseException e) {
+            return null;
+        }
+    }
+
     private boolean validarFechaCaducidad(String fechaCaducidad) {
         // Validar con expresión regular: 4 dígitos de año, guión, 2 dígitos de mes
         if (!fechaCaducidad.matches("\\d{4}-\\d{2}")) {
