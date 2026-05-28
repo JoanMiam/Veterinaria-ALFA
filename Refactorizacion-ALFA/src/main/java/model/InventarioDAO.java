@@ -345,19 +345,38 @@ public class InventarioDAO {
         }
     }
 
-    private boolean validarFechaCaducidad(String fechaCaducidad) {
-        // Validar con expresión regular: 4 dígitos de año, guión, 2 dígitos de mes
-        if (!fechaCaducidad.matches("\\d{4}-\\d{2}")) {
-            return false;
+    /**
+     * Parsea y valida de forma segura la cadena de caducidad del producto.
+     * Centraliza la lógica de validación (regex {@code \d{4}-\d{2}}) y el parseo
+     * a {@link YearMonth} reutilizando lo ya implementado en {@link #validarFechaCaducidad}.
+     *
+     * <p>Diseñado para invocarse desde los 4 puntos vulnerables ({@code registrarVenta},
+     * {@code obtenerMedicamentosProximosACaducar}, {@code obtenerMedicamentosCaducados},
+     * {@code separarProducto}). Ante {@code null} debe interpretarse según el contexto:
+     * las consultas de alertas omiten el registro corrupto; las operaciones de venta/apartado
+     * retornan {@code false} con un mensaje claro al usuario.
+     *
+     * @param fechaCaducidad cadena en formato {@code yyyy-MM} (puede ser {@code null} o vacía).
+     * @return el {@link YearMonth} parseado, o {@code null} si la entrada es nula,
+     *         vacía o tiene formato inválido.
+     */
+    private YearMonth parsearCaducidad(String fechaCaducidad) {
+        if (fechaCaducidad == null || fechaCaducidad.isEmpty()) {
+            return null;
         }
-        // O adicionalmente intentar parsear con YearMonth
+        if (!fechaCaducidad.matches("\\d{4}-\\d{2}")) {
+            return null;
+        }
         try {
             DateTimeFormatter ymFormatter = DateTimeFormatter.ofPattern("yyyy-MM");
-            YearMonth.parse(fechaCaducidad, ymFormatter);
-            return true; // si parsea, es válido
+            return YearMonth.parse(fechaCaducidad, ymFormatter);
         } catch (DateTimeParseException e) {
-            return false;
+            return null;
         }
+    }
+
+    private boolean validarFechaCaducidad(String fechaCaducidad) {
+        return parsearCaducidad(fechaCaducidad) != null;
     }
 
 
@@ -426,7 +445,11 @@ public class InventarioDAO {
 
                 // [MR-003 OPC-A] Validar que el producto no esté caducado.
                 // Un producto caduca al inicio del mes siguiente al indicado en caducidad.
-                YearMonth cadYM = YearMonth.parse(caducidad, DateTimeFormatter.ofPattern("yyyy-MM"));
+                YearMonth cadYM = parsearCaducidad(caducidad);
+                if (cadYM == null) {
+                    JOptionPane.showMessageDialog(null, "No se puede registrar la venta: la caducidad del producto no tiene un formato válido", "Error", JOptionPane.ERROR_MESSAGE);
+                    return false;
+                }
                 LocalDate fechaExpiracion = cadYM.plusMonths(1).atDay(1);
                 if (!LocalDate.now().isBefore(fechaExpiracion)) {
                     JOptionPane.showMessageDialog(null, "No se puede registrar la venta: el medicamento está caducado", "Error", JOptionPane.ERROR_MESSAGE);
@@ -671,13 +694,15 @@ public class InventarioDAO {
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery("SELECT * FROM productos")) {
 
-            DateTimeFormatter ymFormatter = DateTimeFormatter.ofPattern("yyyy-MM");
             LocalDate hoy = LocalDate.now();
 
             while (rs.next()) {
                 String caducidadStr = rs.getString("caducidad"); // "yyyy-MM"
-                // Parseamos a YearMonth
-                YearMonth cadYM = YearMonth.parse(caducidadStr, ymFormatter);
+                // [MR-003 OPC-A] Parseo seguro: omitir registros con caducidad corrupta.
+                YearMonth cadYM = parsearCaducidad(caducidadStr);
+                if (cadYM == null) {
+                    continue;
+                }
 
                 // [MR-003 OPC-A] Expira el primer día del mes siguiente al indicado.
                 LocalDate primerDiaCaducidad = cadYM.plusMonths(1).atDay(1);
@@ -715,12 +740,15 @@ public class InventarioDAO {
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery("SELECT * FROM productos")) {
 
-            DateTimeFormatter ymFormatter = DateTimeFormatter.ofPattern("yyyy-MM");
             LocalDate hoy = LocalDate.now();
 
             while (rs.next()) {
                 String caducidadStr = rs.getString("caducidad"); // "yyyy-MM"
-                YearMonth cadYM = YearMonth.parse(caducidadStr, ymFormatter);
+                // [MR-003 OPC-A] Parseo seguro: omitir registros con caducidad corrupta.
+                YearMonth cadYM = parsearCaducidad(caducidadStr);
+                if (cadYM == null) {
+                    continue;
+                }
                 // [MR-003 OPC-A] Expira el primer día del mes siguiente al indicado.
                 LocalDate primerDiaCaducidad = cadYM.plusMonths(1).atDay(1);
 
@@ -773,7 +801,14 @@ public class InventarioDAO {
                     if (!rs.next()) return false;
                     String caducidadStr = rs.getString("caducidad");
                     int existencias = rs.getInt("existencias");
-                    YearMonth caducidad = YearMonth.parse(caducidadStr, DateTimeFormatter.ofPattern("yyyy-MM"));
+                    // [MR-003 OPC-A] Parseo seguro: ante caducidad corrupta, no se aparta.
+                    YearMonth caducidad = parsearCaducidad(caducidadStr);
+                    if (caducidad == null) {
+                        JOptionPane.showMessageDialog(null,
+                            "No se puede registrar el apartado: la caducidad del producto no tiene un formato válido",
+                            "Error", JOptionPane.ERROR_MESSAGE);
+                        return false;
+                    }
                     if (estaCaducado(caducidad)) {
                         JOptionPane.showMessageDialog(null,
                             "No se puede registrar el apartado: el medicamento está caducado",

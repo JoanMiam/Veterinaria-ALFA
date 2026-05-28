@@ -183,4 +183,23 @@ class InventarioDAOSepararProductoTest {
 
         assertFalse(resultado, "ID inexistente debe retornar false");
     }
+
+    // =========================================================================
+    // TC-06: Caducidad corrupta → sin apartado en BD (MR-008 OPC-A)
+    // =========================================================================
+
+    @Test
+    @DisplayName("TC-06: Producto con caducidad corrupta → separarProducto no registra apartado")
+    void tc06_caducidadCorrupta_noRegistraApartado() throws SQLException {
+        int id = insertarProducto("Med-Basura", 10, "no-es-fecha");
+
+        try {
+            dao.separarProducto(id, "2026-05-18");
+        } catch (Exception ignored) {
+            // HeadlessException esperada en entorno sin GUI; lo relevante es el estado de la BD
+        }
+
+        assertNull(fechaSeparadoEnBD(id),
+            "Producto con caducidad corrupta no debe tener fecha_separado registrada");
+    }
 }

@@ -381,7 +381,8 @@ public class InventarioView {
         String nombre = table.getValueAt(selectedRow, 1).toString();
         String existencias = table.getValueAt(selectedRow, 2).toString();
         String lote = table.getValueAt(selectedRow, 3).toString();
-        String caducidad = table.getValueAt(selectedRow, 4).toString();
+        Object rawCaducidad = table.getValueAt(selectedRow, 4);
+        String caducidad = rawCaducidad != null ? rawCaducidad.toString() : "";
         String fechaEntrada = table.getValueAt(selectedRow, 5).toString();
 
         new EditarMedicamentoView(
