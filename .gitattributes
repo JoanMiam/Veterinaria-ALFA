@@ -1,0 +1,9 @@
+# Fines de línea normalizados a LF en el repositorio y en la copia de trabajo
+* text=auto eol=lf
+
+# Binarios
+*.jar binary
+*.ico binary
+*.png binary
+*.jpg binary
+*.db  binary
