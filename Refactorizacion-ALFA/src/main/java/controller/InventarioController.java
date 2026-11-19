@@ -69,8 +69,13 @@ public class InventarioController {
     }
 
 
+    /** [FIX-009] Al eliminar una venta se regresa su cantidad al stock: se refresca el inventario. */
     public boolean eliminarVenta(Object id) {
-        return dao.eliminarVenta(id);
+        boolean result = dao.eliminarVenta(id);
+        if (result && inventarioView != null) {
+            inventarioView.cargarDatos();
+        }
+        return result;
     }
 
     public Object[][] obtenerProductos() {
@@ -82,13 +87,13 @@ public class InventarioController {
     }
 
     /** [MR-005 – OPC-A] Delega la generación del reporte HTML de ventas al DAO. */
-    public void exportarCSV(File fileToSave) {
-        dao.exportarVentasHTML(fileToSave);
+    public boolean exportarCSV(File fileToSave) {
+        return dao.exportarVentasHTML(fileToSave);
     }
 
     /** [MR-005 – OPC-A] Delega la generación del reporte HTML del inventario al DAO. */
-    public void exportarInventarioCSV(File fileToSave) {
-        dao.exportarInventarioHTML(fileToSave);
+    public boolean exportarInventarioCSV(File fileToSave) {
+        return dao.exportarInventarioHTML(fileToSave);
     }
 
 
@@ -115,8 +120,8 @@ public class InventarioController {
     }
 
     /** [MR-005 – OPC-A] Delega la generación del reporte HTML de apartados al DAO. */
-    public void exportarApartadosCSV(File fileToSave) {
-        dao.exportarApartadosHTML(fileToSave);
+    public boolean exportarApartadosCSV(File fileToSave) {
+        return dao.exportarApartadosHTML(fileToSave);
     }
 
     /**

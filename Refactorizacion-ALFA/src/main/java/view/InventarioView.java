@@ -17,10 +17,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.time.LocalDate;
-import java.time.YearMonth;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Properties;
 
@@ -36,7 +32,6 @@ import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.JToggleButton;
 import javax.swing.ListSelectionModel;
-import javax.swing.RowFilter;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.table.DefaultTableCellRenderer;
@@ -47,6 +42,8 @@ import com.formdev.flatlaf.FlatDarkLaf;
 import com.formdev.flatlaf.FlatLightLaf;
 
 import controller.InventarioController;
+import model.ReglasCaducidad;
+import util.RutasApp;
 
 public class InventarioView {
     private JFrame frame;
@@ -225,7 +222,7 @@ public class InventarioView {
         addHoverEffect(btnEliminar);
         JButton btnEditar = createButton("Editar", "");
         addHoverEffect(btnEditar);
-        JButton btnExportar = createButton("Exportar a Excel", "");
+        JButton btnExportar = createButton("Exportar reporte", "");
         addHoverEffect(btnExportar);
         JButton btnVentas = createButton("Ventas", "");
         addHoverEffect(btnVentas);
@@ -266,7 +263,7 @@ public class InventarioView {
 
         // Alerta de caducidad después de mostrar la ventana
         SwingUtilities.invokeLater(() -> {
-            List<Object[]> proximos = controller.obtenerMedicamentosProximosACaducar(30);
+            List<Object[]> proximos = controller.obtenerMedicamentosProximosACaducar(ReglasCaducidad.DIAS_ALERTA);
             List<Object[]> caducados = controller.obtenerMedicamentosCaducados();
             if (!proximos.isEmpty() || !caducados.isEmpty()) {
                 JOptionPane.showMessageDialog(frame,
@@ -332,11 +329,8 @@ public class InventarioView {
     }
 
     private void aplicarFiltro(String criterio) {
-        if (criterio.trim().isEmpty()) {
-            rowSorter.setRowFilter(null);
-        } else {
-            rowSorter.setRowFilter(RowFilter.regexFilter("(?i)" + criterio));
-        }
+        // [FIX-009] El texto se trata como literal: "(", "[" o "*" ya no truenan la app.
+        rowSorter.setRowFilter(FiltrosTabla.contieneTexto(criterio));
     }
 
     private void eliminarProducto() {
@@ -345,9 +339,10 @@ public class InventarioView {
             JOptionPane.showMessageDialog(frame, "Selecciona un medicamento para eliminar.", "Aviso", JOptionPane.WARNING_MESSAGE);
             return;
         }
-        String mensajeConfirmacion = (selectedRows.length == 1)
+        String mensajeConfirmacion = ((selectedRows.length == 1)
                 ? "¿Estás seguro de eliminar este medicamento?"
-                : "¿Estás seguro de eliminar los medicamentos seleccionados?";
+                : "¿Estás seguro de eliminar los medicamentos seleccionados?")
+                + "\nSu historial de ventas se conservará.";
         int confirm = JOptionPane.showConfirmDialog(frame, mensajeConfirmacion, "Confirmación", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
         if (confirm == JOptionPane.YES_OPTION) {
             boolean allSuccess = true;
@@ -405,7 +400,7 @@ public class InventarioView {
         int selection = fileChooser.showSaveDialog(frame);
         if (selection == JFileChooser.APPROVE_OPTION) {
             File file = fileChooser.getSelectedFile();
-            controller.exportarInventarioCSV(file);
+            MensajesExportacion.mostrarResultado(frame, controller.exportarInventarioCSV(file), file);
         }
     }
 
@@ -431,14 +426,14 @@ public class InventarioView {
 
     /**
      * [MR-006 – OPC-A] Lee el valor {@code theme} de {@code config.properties}
-     * ubicado en el directorio de trabajo. Retorna {@code "light"} si el archivo
-     * no existe o la clave no está definida.
+     * ([FIX-009] junto al ejecutable, ver {@link RutasApp}). Retorna {@code "light"}
+     * si el archivo no existe o la clave no está definida.
      *
      * @return {@code "dark"} o {@code "light"}.
      */
     private String leerTema() {
         Properties props = new Properties();
-        File cfg = new File("config.properties");
+        File cfg = RutasApp.archivoConfiguracion().toFile();
         if (cfg.exists()) {
             try (java.io.FileInputStream fis = new java.io.FileInputStream(cfg)) {
                 props.load(fis);
@@ -449,14 +444,14 @@ public class InventarioView {
 
     /**
      * [MR-006 – OPC-A] Persiste la preferencia de tema en {@code config.properties}
-     * en el directorio de trabajo para que el arranque siguiente aplique el mismo tema.
+     * ([FIX-009] junto al ejecutable) para que el arranque siguiente aplique el mismo tema.
      *
      * @param tema {@code "light"} o {@code "dark"}.
      */
     private void guardarTema(String tema) {
         Properties props = new Properties();
         props.setProperty("theme", tema);
-        try (FileOutputStream fos = new FileOutputStream("config.properties")) {
+        try (FileOutputStream fos = new FileOutputStream(RutasApp.archivoConfiguracion().toFile())) {
             props.store(fos, "MR-006 – OPC-A: preferencia de tema visual");
         } catch (IOException e) {
             e.printStackTrace();
@@ -496,27 +491,17 @@ public class InventarioView {
 
             // Columna 4 -> "Caducidad" con formato "yyyy-MM"
             if (column == 4 && value != null) {
-                try {
-                    // Parseamos como YearMonth
-                    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM");
-                    // Convertir a YearMonth
-                    YearMonth cadYM = YearMonth.parse(value.toString(), formatter);
-                    // [MR-003 OPC-A] Expira el primer día del mes siguiente al indicado.
-                    LocalDate primerDiaCaducidad = cadYM.plusMonths(1).atDay(1);
-                    LocalDate hoy = LocalDate.now();
-                    long diasRestantes = ChronoUnit.DAYS.between(hoy, primerDiaCaducidad);
+                // [FIX-009] Misma regla que el DAO (ReglasCaducidad): el día en que expira ya es "caducado".
+                ReglasCaducidad.Estado estado = ReglasCaducidad.estado(
+                        value.toString(), LocalDate.now(), ReglasCaducidad.DIAS_ALERTA);
 
-                    if (mostrarColores &&diasRestantes < 0) {
-                        c.setBackground(new Color(255, 0, 0)); // Rojo fuerte (ya caducado)
-                    } else if (mostrarColores && diasRestantes <= 30) {
-                        c.setBackground(new Color(255, 153, 153)); // Rojo claro (próximo a caducar)
-                    } else if (row == hoveredRow && !isSelected) {
-                        c.setBackground(new Color(220, 240, 255)); // Hover
-                    } else {
-                        c.setBackground(isSelected ? table.getSelectionBackground() : table.getBackground());
-                    }
-                } catch (DateTimeParseException e) {
-                    // Si no se puede parsear "yyyy-MM", se deja color normal
+                if (mostrarColores && estado == ReglasCaducidad.Estado.CADUCADO) {
+                    c.setBackground(new Color(255, 0, 0)); // Rojo fuerte (ya caducado)
+                } else if (mostrarColores && estado == ReglasCaducidad.Estado.PROXIMO) {
+                    c.setBackground(new Color(255, 153, 153)); // Rojo claro (próximo a caducar)
+                } else if (row == hoveredRow && !isSelected) {
+                    c.setBackground(new Color(220, 240, 255)); // Hover
+                } else {
                     c.setBackground(isSelected ? table.getSelectionBackground() : table.getBackground());
                 }
             } else {
