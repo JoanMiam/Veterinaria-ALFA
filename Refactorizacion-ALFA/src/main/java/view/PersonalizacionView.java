@@ -26,7 +26,12 @@ import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import controller.InventarioController;
+import model.ConfiguracionVeterinaria;
+import util.Registro;
 
 /**
  * [MR-005 – OPC-A] Diálogo modal para configurar los datos de la clínica veterinaria
@@ -48,6 +53,9 @@ import controller.InventarioController;
  * {@link InventarioController#obtenerConfiguracion}.
  */
 public class PersonalizacionView extends FormularioConfirmableDialog {
+
+    private static final long serialVersionUID = 1L;
+    private static final Logger LOG = Registro.de(PersonalizacionView.class);
 
     private final InventarioController controller;
 
@@ -190,22 +198,17 @@ public class PersonalizacionView extends FormularioConfirmableDialog {
      * al completar el guardado.
      */
     private void guardar() {
-        String nombre = txtNombre.getText().trim();
-        if (nombre.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "El nombre de la veterinaria es obligatorio.",
-                    "Aviso", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-        controller.guardarConfiguracion(
+        ConfiguracionVeterinaria config = new ConfiguracionVeterinaria(
                 logoBase64,
-                nombre,
+                txtNombre.getText().trim(),
                 txtDireccion.getText().trim(),
                 txtTelefono.getText().trim(),
                 txtRfc.getText().trim(),
-                txtHorarios.getText().trim()
-        );
-        JOptionPane.showMessageDialog(this, "Configuración guardada correctamente.");
-        dispose();
+                txtHorarios.getText().trim());
+        if (Dialogos.ejecutar(this, () -> controller.guardarConfiguracion(config))) {
+            Dialogos.info(this, "Configuración guardada correctamente.");
+            dispose();
+        }
     }
 
     /**
@@ -213,22 +216,24 @@ public class PersonalizacionView extends FormularioConfirmableDialog {
      * del formulario. Si no existe configuración, los campos quedan vacíos.
      */
     private void cargarDatosExistentes() {
-        Object[] config = controller.obtenerConfiguracion();
+        ConfiguracionVeterinaria config = controller.obtenerConfiguracion().orElse(null);
         if (config == null) return;
-        logoBase64 = config[0] != null ? config[0].toString() : null;
-        if (logoBase64 != null && !logoBase64.isEmpty()) {
+        logoBase64 = config.tieneLogo() ? config.logoBase64() : null;
+        if (logoBase64 != null) {
             try {
                 byte[] bytes = Base64.getDecoder().decode(logoBase64);
                 ImageIcon icon = new ImageIcon(bytes);
                 Image scaled = icon.getImage().getScaledInstance(78, 78, Image.SCALE_SMOOTH);
                 lblLogoPreview.setIcon(new ImageIcon(scaled));
                 lblLogoPreview.setText("");
-            } catch (Exception ignored) { }
+            } catch (IllegalArgumentException e) {
+                LOG.log(Level.WARNING, "Logotipo guardado con Base64 inválido", e);
+            }
         }
-        if (config[1] != null) txtNombre.setText(config[1].toString());
-        if (config[2] != null) txtDireccion.setText(config[2].toString());
-        if (config[3] != null) txtTelefono.setText(config[3].toString());
-        if (config[4] != null) txtRfc.setText(config[4].toString());
-        if (config[5] != null) txtHorarios.setText(config[5].toString());
+        if (config.nombre() != null) txtNombre.setText(config.nombre());
+        if (config.direccion() != null) txtDireccion.setText(config.direccion());
+        if (config.telefono() != null) txtTelefono.setText(config.telefono());
+        if (config.rfc() != null) txtRfc.setText(config.rfc());
+        if (config.horarios() != null) txtHorarios.setText(config.horarios());
     }
 }

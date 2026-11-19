@@ -20,7 +20,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * PRU-001-01 — Pruebas Unitarias para HoverTableCellRenderer (MR-001)
+ * PRU-001-01 — Pruebas Unitarias para el renderer de tablas (MR-001).
+ *
+ * [MR-010] El antiguo InventarioView.HoverTableCellRenderer ahora es view.RendererTabla,
+ * compartido por inventario, ventas y apartados.
  *
  * Verifica que el toggle de colores de caducidad funciona correctamente
  * a nivel de componente, sin depender de la vista completa.
@@ -37,8 +40,8 @@ class HoverTableCellRendererTest {
     // Helpers
     // -------------------------------------------------------------------------
 
-    private InventarioView.HoverTableCellRenderer crearRenderer() {
-        return new InventarioView.HoverTableCellRenderer();
+    private RendererTabla crearRenderer() {
+        return new RendererTabla(4);
     }
 
     private JTable crearTabla(String fechaCaducidad) {
@@ -49,9 +52,9 @@ class HoverTableCellRendererTest {
         return new JTable(model);
     }
 
-    private boolean leerCampoMostrarColores(InventarioView.HoverTableCellRenderer renderer)
+    private boolean leerCampoMostrarColores(RendererTabla renderer)
             throws Exception {
-        Field field = InventarioView.HoverTableCellRenderer.class.getDeclaredField("mostrarColores");
+        Field field = RendererTabla.class.getDeclaredField("mostrarColores");
         field.setAccessible(true);
         return (boolean) field.get(renderer);
     }
@@ -86,7 +89,7 @@ class HoverTableCellRendererTest {
     @Test
     @DisplayName("TC-01: setMostrarColores(false) → campo mostrarColores vale false")
     void tc01_setMostrarColoresFalse_campoEsFalse() throws Exception {
-        InventarioView.HoverTableCellRenderer renderer = crearRenderer();
+        RendererTabla renderer = crearRenderer();
 
         renderer.setMostrarColores(false);
 
@@ -101,7 +104,7 @@ class HoverTableCellRendererTest {
     @Test
     @DisplayName("TC-02: setMostrarColores(true) → campo mostrarColores vale true")
     void tc02_setMostrarColoresTrue_campoEsTrue() throws Exception {
-        InventarioView.HoverTableCellRenderer renderer = crearRenderer();
+        RendererTabla renderer = crearRenderer();
         renderer.setMostrarColores(false); // estado previo: desactivado
 
         renderer.setMostrarColores(true);
@@ -119,7 +122,7 @@ class HoverTableCellRendererTest {
     void tc03_productoCaducado_coloresActivos_fondoRojoFuerte() {
         String fecha = fechaCaducada();
         JTable tabla = crearTabla(fecha);
-        InventarioView.HoverTableCellRenderer renderer = crearRenderer();
+        RendererTabla renderer = crearRenderer();
 
         renderer.setMostrarColores(true);
         Component celda = renderer.getTableCellRendererComponent(tabla, fecha, false, false, 0, 4);
@@ -137,7 +140,7 @@ class HoverTableCellRendererTest {
     void tc04_productoCaducado_coloresInactivos_sinRojo() {
         String fecha = fechaCaducada();
         JTable tabla = crearTabla(fecha);
-        InventarioView.HoverTableCellRenderer renderer = crearRenderer();
+        RendererTabla renderer = crearRenderer();
 
         renderer.setMostrarColores(false);
         Component celda = renderer.getTableCellRendererComponent(tabla, fecha, false, false, 0, 4);
@@ -157,7 +160,7 @@ class HoverTableCellRendererTest {
     void tc05_productoProximo_coloresActivos_fondoRojoClaro() {
         String fecha = fechaProximaCaducidad();
         JTable tabla = crearTabla(fecha);
-        InventarioView.HoverTableCellRenderer renderer = crearRenderer();
+        RendererTabla renderer = crearRenderer();
 
         renderer.setMostrarColores(true);
         Component celda = renderer.getTableCellRendererComponent(tabla, fecha, false, false, 0, 4);
@@ -175,7 +178,7 @@ class HoverTableCellRendererTest {
     void tc06_productoProximo_coloresInactivos_sinRojo() {
         String fecha = fechaProximaCaducidad();
         JTable tabla = crearTabla(fecha);
-        InventarioView.HoverTableCellRenderer renderer = crearRenderer();
+        RendererTabla renderer = crearRenderer();
 
         renderer.setMostrarColores(false);
         Component celda = renderer.getTableCellRendererComponent(tabla, fecha, false, false, 0, 4);
@@ -193,7 +196,7 @@ class HoverTableCellRendererTest {
     @Test
     @DisplayName("TC-07: Estado inicial → mostrarColores es true por defecto")
     void tc07_estadoInicial_mostrarColoresEsTrue() throws Exception {
-        InventarioView.HoverTableCellRenderer renderer = crearRenderer();
+        RendererTabla renderer = crearRenderer();
 
         assertTrue(leerCampoMostrarColores(renderer),
                 "Al crear el renderer, mostrarColores debe ser true (comportamiento original)");
