@@ -2,3 +2,5 @@
 .DS_Store
 *.db
 .vscode/
+# Preferencias locales (las genera la app)
+config.properties
