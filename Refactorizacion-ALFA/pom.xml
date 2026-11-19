@@ -12,14 +12,17 @@
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- [FIX-009] Las pruebas corren sin interfaz gráfica: ningún JOptionPane bloquea el build.
+             Para correr también las pruebas de GUI: mvn test -DargLine= -->
+        <argLine>-Djava.awt.headless=true</argLine>
     </properties>
 
     <dependencies>
-        <!-- SQLite JDBC -->
+        <!-- SQLite JDBC. [FIX-009] 3.41.2.1 era vulnerable a CVE-2023-32697 -->
         <dependency>
             <groupId>org.xerial</groupId>
             <artifactId>sqlite-jdbc</artifactId>
-            <version>3.41.2.1</version>
+            <version>3.53.4.0</version>
         </dependency>
 
         <!-- JUnit para pruebas -->

@@ -3,6 +3,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Properties;
 
+import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 
@@ -11,6 +12,7 @@ import com.formdev.flatlaf.FlatLightLaf;
 
 import controller.InventarioController;
 import model.InventarioDAO;
+import util.RutasApp;
 import view.InventarioView;
 
 /**
@@ -24,9 +26,9 @@ public class InventarioApp {
 
     /**
      * [MR-006 – OPC-A] Ruta del archivo de configuración de preferencias de usuario.
-     * Se ubica junto al JAR ejecutable (directorio de trabajo).
+     * [FIX-009] Se ubica junto al ejecutable, sin importar desde dónde se lance (ver {@link RutasApp}).
      */
-    public static final String CONFIG_PATH = "config.properties";
+    public static final String CONFIG_PATH = RutasApp.archivoConfiguracion().toString();
 
     /**
      * [MR-006 – OPC-A] Lee la preferencia de tema y aplica el Look &amp; Feel
@@ -37,8 +39,19 @@ public class InventarioApp {
     public static void main(String[] args) {
         aplicarTema(leerTema());
         SwingUtilities.invokeLater(() -> {
-            InventarioDAO dao = new InventarioDAO();
-            dao.crearBaseDeDatos();
+            InventarioDAO dao;
+            try {
+                // El constructor abre la BD junto al ejecutable y deja el esquema al día.
+                dao = new InventarioDAO();
+            } catch (IllegalStateException e) {
+                // [FIX-009] Antes el error se imprimía y la app seguía con una conexión nula.
+                e.printStackTrace();
+                JOptionPane.showMessageDialog(null,
+                        "No se pudo abrir la base de datos:\n" + e.getMessage(),
+                        "Error al iniciar", JOptionPane.ERROR_MESSAGE);
+                System.exit(1);
+                return;
+            }
             InventarioController controller = new InventarioController(dao);
             new InventarioView(controller);
         });

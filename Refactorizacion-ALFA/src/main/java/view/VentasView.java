@@ -25,7 +25,6 @@ import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
-import javax.swing.RowFilter;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.table.DefaultTableCellRenderer;
@@ -215,11 +214,8 @@ public class VentasView extends JDialog {
     private void aplicarFiltroAvanzado() {
         String texto = txtFiltrar.getText().trim();
         int columnIndex = cmbFiltro.getSelectedIndex();
-        if (texto.isEmpty()) {
-            rowSorter.setRowFilter(null);
-        } else {
-            rowSorter.setRowFilter(RowFilter.regexFilter("(?i)" + texto, columnIndex));
-        }
+        // [FIX-009] El texto se trata como literal: "(", "[" o "*" ya no truenan la app.
+        rowSorter.setRowFilter(FiltrosTabla.contieneTexto(texto, columnIndex));
     }
 
     private void openRegistrarVenta() {
@@ -262,9 +258,10 @@ public class VentasView extends JDialog {
             return;
         }
 
-        String mensajeConfirmacion = (selectedRows.length == 1)
+        String mensajeConfirmacion = ((selectedRows.length == 1)
                 ? "¿Estás seguro de eliminar esta venta?"
-                : "¿Estás seguro de eliminar las ventas seleccionadas?";
+                : "¿Estás seguro de eliminar las ventas seleccionadas?")
+                + "\nLa cantidad vendida regresará al inventario.";
 
         int confirm = JOptionPane.showConfirmDialog(
                 this,
@@ -314,7 +311,8 @@ public class VentasView extends JDialog {
         fileChooser.setSelectedFile(new File("reporte_ventas.html"));
         int selection = fileChooser.showSaveDialog(this);
         if (selection == JFileChooser.APPROVE_OPTION) {
-            controller.exportarCSV(fileChooser.getSelectedFile());
+            File file = fileChooser.getSelectedFile();
+            MensajesExportacion.mostrarResultado(this, controller.exportarCSV(file), file);
         }
     }
 

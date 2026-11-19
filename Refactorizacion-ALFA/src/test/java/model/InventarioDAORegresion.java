@@ -176,13 +176,15 @@ class InventarioDAORegresionTest {
     }
 
     @Test
-    @DisplayName("CR-07: eliminarProducto borra el registro y retorna true")
+    @DisplayName("CR-07: eliminarProducto oculta el producto (borrado lógico, FIX-009) y retorna true")
     void cr07_eliminarProducto_eliminaRegistroYRetornaTrue() throws SQLException {
         boolean resultado = dao.eliminarProducto(1);
 
         assertTrue(resultado, "eliminarProducto debe retornar true cuando el id existe");
-        assertEquals(0, contarFilas("productos"),
-            "La tabla productos debe quedar vacía tras eliminar el único registro");
+        assertEquals(0, dao.obtenerProductos().length,
+            "El producto eliminado ya no debe aparecer en el inventario");
+        assertEquals(1, contarFilas("productos"),
+            "[FIX-009] La fila se conserva (activo = 0) para no perder el historial de ventas");
     }
 
     // =========================================================================

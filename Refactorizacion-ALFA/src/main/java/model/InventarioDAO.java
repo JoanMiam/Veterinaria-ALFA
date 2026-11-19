@@ -2,6 +2,7 @@ package model;
 
 import java.io.File;
 import java.io.FileWriter;
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -12,31 +13,50 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 
 import javax.swing.JOptionPane;
 
+import util.RutasApp;
+
 public class InventarioDAO {
+
+    /** Columnas de producto que se muestran en las tablas (mismo orden que el esquema original). */
+    private static final String COLUMNAS_PRODUCTO =
+            "id, nombre, existencias, lote, caducidad, fechaEntrada, fecha_separado";
 
     private Connection connection;
     private String dbUrl;
 
+    /**
+     * Abre (o crea) la base de datos en {@code dbUrl} y deja el esquema al día.
+     *
+     * @throws IllegalStateException si no se puede abrir la BD o crear el esquema.
+     */
     public InventarioDAO(String dbUrl) {
         this.dbUrl = dbUrl;
-        try {
-            Class.forName("org.sqlite.JDBC");
-            this.connection = DriverManager.getConnection(dbUrl);
-        } catch (ClassNotFoundException | SQLException e) {
-            e.printStackTrace();
-        }
+        this.connection = abrirConexion(dbUrl);
+        inicializarEsquema();
     }
 
-
-    // Constructor para pruebas (acepta conexión existente)
+    /**
+     * Constructor para pruebas (acepta conexión existente). También deja el esquema
+     * al día: crea las tablas que falten y aplica migraciones.
+     */
     public InventarioDAO(Connection connection) {
         this.connection = connection;
+        inicializarEsquema();
+    }
+
+    /**
+     * [FIX-009] Abre la BD en {@code <carpeta del ejecutable>/db/baseDeDatosInventario.db}
+     * (ver {@link RutasApp}), sin depender del directorio desde donde se lanzó la app.
+     *
+     * @throws IllegalStateException si no se puede preparar la carpeta o abrir la BD.
+     */
+    public InventarioDAO() {
+        this(urlPorDefecto());
     }
 
     public Connection getConnection() {
@@ -49,30 +69,47 @@ public class InventarioDAO {
         }
     }
 
-    public InventarioDAO() {
-        // 1. Ruta relativa al directorio actual
-        String carpetaBD = "./db"; // subcarpeta "db" junto al .exe/.jar
-
-        // 2. Crear la carpeta si no existe
-        File folderFile = new File(carpetaBD);
-        if (!folderFile.exists()) {
-            folderFile.mkdirs();
-        }
-
-        // 3. Construir la URL de la base de datos
-        this.dbUrl = "jdbc:sqlite:" + carpetaBD + "/baseDeDatosInventario.db";
-
-        // 4. Conectar
+    private static String urlPorDefecto() {
         try {
-            Class.forName("org.sqlite.JDBC");
-            this.connection = DriverManager.getConnection(dbUrl);
-        } catch (ClassNotFoundException | SQLException e) {
-            e.printStackTrace();
+            return "jdbc:sqlite:" + RutasApp.prepararBaseDatos();
+        } catch (IOException e) {
+            throw new IllegalStateException(
+                    "No se pudo preparar la carpeta de la base de datos (" + RutasApp.archivoBaseDatos() + "): "
+                            + e.getMessage(), e);
         }
     }
 
+    /**
+     * [FIX-009] Antes los errores de conexión se imprimían y la conexión quedaba en
+     * {@code null}, provocando un {@code NullPointerException} más adelante.
+     */
+    private static Connection abrirConexion(String url) {
+        try {
+            Class.forName("org.sqlite.JDBC");
+            return DriverManager.getConnection(url);
+        } catch (ClassNotFoundException | SQLException e) {
+            throw new IllegalStateException("No se pudo abrir la base de datos (" + url + "): " + e.getMessage(), e);
+        }
+    }
 
+    /** Se conserva por compatibilidad: el esquema ya se inicializa en el constructor. */
     public void crearBaseDeDatos() {
+        inicializarEsquema();
+    }
+
+    /**
+     * Crea las tablas que no existan y aplica las migraciones pendientes. Es idempotente.
+     *
+     * <p>Migraciones:
+     * <ul>
+     *   <li>[FIX-009] {@code productos.activo}: borrado lógico. Un producto eliminado se
+     *       oculta ({@code activo = 0}) en lugar de borrarse, para conservar su historial de ventas.</li>
+     * </ul>
+     *
+     * <p>Nota: {@code historial_ventas} declara una FK sin {@code ON DELETE CASCADE} y las
+     * FKs de SQLite siguen desactivadas, así que nunca se borra historial en cascada.
+     */
+    private void inicializarEsquema() {
         try (Statement stmt = connection.createStatement()) {
             stmt.execute("CREATE TABLE IF NOT EXISTS productos (" +
                     "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
@@ -81,14 +118,15 @@ public class InventarioDAO {
                     "lote TEXT, " +
                     "caducidad TEXT, " +
                     "fechaEntrada TEXT, " +
-                    "fecha_separado TEXT)"); // NUEVA COLUMNA
+                    "fecha_separado TEXT, " +
+                    "activo INTEGER NOT NULL DEFAULT 1)");
             stmt.execute("CREATE TABLE IF NOT EXISTS historial_ventas (" +
                     "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                     "idProducto INTEGER, " +
                     "nombre TEXT, " +
                     "cantidad INTEGER, " +
                     "fechaVenta TEXT, " +
-                    "FOREIGN KEY (idProducto) REFERENCES productos(id) ON DELETE CASCADE)");
+                    "FOREIGN KEY (idProducto) REFERENCES productos(id))");
             stmt.execute("CREATE TABLE IF NOT EXISTS configuracion_veterinaria (" +
                     "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                     "logo TEXT, " +
@@ -97,8 +135,75 @@ public class InventarioDAO {
                     "telefono TEXT, " +
                     "rfc TEXT, " +
                     "horarios TEXT)");
+            if (!columnaExiste("productos", "activo")) {
+                stmt.execute("ALTER TABLE productos ADD COLUMN activo INTEGER NOT NULL DEFAULT 1");
+            }
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new IllegalStateException("No se pudo inicializar el esquema de la base de datos: " + e.getMessage(), e);
+        }
+    }
+
+    private boolean columnaExiste(String tabla, String columna) throws SQLException {
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery("PRAGMA table_info(" + tabla + ")")) {
+            while (rs.next()) {
+                if (columna.equalsIgnoreCase(rs.getString("name"))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Operación de BD que puede lanzar {@link SQLException}. */
+    @FunctionalInterface
+    private interface OperacionSql<T> {
+        T ejecutar() throws SQLException;
+    }
+
+    /**
+     * [FIX-009] Ejecuta {@code operacion} en una transacción: confirma si termina bien y
+     * deshace todos los cambios si lanza cualquier excepción.
+     */
+    private <T> T enTransaccion(OperacionSql<T> operacion) throws SQLException {
+        boolean autoCommitPrevio = connection.getAutoCommit();
+        connection.setAutoCommit(false);
+        try {
+            T resultado = operacion.ejecutar();
+            connection.commit();
+            return resultado;
+        } catch (SQLException | RuntimeException e) {
+            connection.rollback();
+            throw e;
+        } finally {
+            connection.setAutoCommit(autoCommitPrevio);
+        }
+    }
+
+    /** [FIX-009] Escapa texto para insertarlo en los reportes HTML. */
+    static String escaparHtml(Object valor) {
+        if (valor == null) {
+            return "";
+        }
+        String texto = valor.toString();
+        StringBuilder sb = new StringBuilder(texto.length());
+        for (int i = 0; i < texto.length(); i++) {
+            char c = texto.charAt(i);
+            switch (c) {
+                case '<' -> sb.append("&lt;");
+                case '>' -> sb.append("&gt;");
+                case '&' -> sb.append("&amp;");
+                case '"' -> sb.append("&quot;");
+                case '\'' -> sb.append("&#39;");
+                default -> sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    private static void escribirArchivo(File destino, String contenido) throws IOException {
+        try (FileWriter writer = new FileWriter(destino)) {
+            writer.write(contenido);
         }
     }
 
@@ -188,26 +293,27 @@ public class InventarioDAO {
                 // JPG base64 starts with /9j/; PNG starts with iVBOR
                 String mime = b64.startsWith("/9j/") ? "image/jpeg" : "image/png";
                 html.append("<div style=\"text-align:center;margin-bottom:10px;\">")
-                    .append("<img src=\"data:").append(mime).append(";base64,").append(b64)
+                    .append("<img src=\"data:").append(mime).append(";base64,").append(escaparHtml(b64))
                     .append("\" style=\"max-height:80px;\"/></div>\n");
             }
-            html.append("<h1>").append(config[1]).append("</h1>\n");
+            html.append("<h1>").append(escaparHtml(config[1])).append("</h1>\n");
             html.append("<div class=\"vet-info\">");
-            if (config[2] != null) html.append(config[2]).append(" &nbsp;|&nbsp; ");
-            if (config[3] != null) html.append("Tel: ").append(config[3]).append(" &nbsp;|&nbsp; ");
-            if (config[4] != null) html.append("RFC: ").append(config[4]);
-            if (config[5] != null) html.append("<br/>Horarios: ").append(config[5]);
+            if (config[2] != null) html.append(escaparHtml(config[2])).append(" &nbsp;|&nbsp; ");
+            if (config[3] != null) html.append("Tel: ").append(escaparHtml(config[3])).append(" &nbsp;|&nbsp; ");
+            if (config[4] != null) html.append("RFC: ").append(escaparHtml(config[4]));
+            if (config[5] != null) html.append("<br/>Horarios: ").append(escaparHtml(config[5]));
             html.append("</div>\n");
         }
-        html.append("<h1>").append(titulo).append("</h1>\n");
+        html.append("<h1>").append(escaparHtml(titulo)).append("</h1>\n");
         return html;
     }
 
 
 
+    /** @return productos activos (los eliminados quedan ocultos, ver {@link #eliminarProducto(int)}). */
     public Object[][] obtenerProductos() {
         try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT * FROM productos")) {
+             ResultSet rs = stmt.executeQuery("SELECT " + COLUMNAS_PRODUCTO + " FROM productos WHERE activo = 1")) {
             return rsToArray(rs);
         } catch (SQLException e) {
             e.printStackTrace();
@@ -254,10 +360,17 @@ public class InventarioDAO {
 
 
 
+    /**
+     * [FIX-009] Borrado lógico: el producto deja de aparecer en inventario, búsquedas,
+     * alertas, apartados y reportes, pero la fila se conserva para que su historial de
+     * ventas siga siendo consultable y editable. También se libera su apartado.
+     *
+     * @return {@code true} si el producto existía y estaba activo.
+     */
     public boolean eliminarProducto(int id) {
         try {
             ensureConnection();
-            String sql = "DELETE FROM productos WHERE id = ?";
+            String sql = "UPDATE productos SET activo = 0, fecha_separado = NULL WHERE id = ? AND activo = 1";
             try (PreparedStatement pstmt = this.connection.prepareStatement(sql)) {
                 pstmt.setInt(1, id);
                 int filasAfectadas = pstmt.executeUpdate();
@@ -289,7 +402,7 @@ public class InventarioDAO {
                 return false;
             }
 
-            String sql = "UPDATE productos SET nombre = ?, existencias = ?, lote = ?, caducidad = ?, fechaEntrada = ? WHERE id = ?";
+            String sql = "UPDATE productos SET nombre = ?, existencias = ?, lote = ?, caducidad = ?, fechaEntrada = ? WHERE id = ? AND activo = 1";
             try (PreparedStatement pstmt = this.connection.prepareStatement(sql)) {
                 pstmt.setString(1, nombre);
                 pstmt.setInt(2, existenciasInt);
@@ -319,9 +432,12 @@ public class InventarioDAO {
      *
      * <p>Columnas del reporte: Nombre del Medicamento, Cantidad Vendida, Fecha de Venta.
      *
+     * <p>[FIX-009] Ya no muestra diálogos (la vista informa al usuario) y escapa el texto.
+     *
      * @param fileToSave Ruta destino del archivo {@code .html} a generar.
+     * @return {@code true} si el archivo se generó.
      */
-    public void exportarVentasHTML(File fileToSave) {
+    public boolean exportarVentasHTML(File fileToSave) {
         try (Statement stmt = this.connection.createStatement();
              ResultSet rs = stmt.executeQuery("SELECT nombre, cantidad, fechaVenta FROM historial_ventas")) {
             StringBuilder html = buildHtmlHeader("Reporte de Ventas");
@@ -329,19 +445,17 @@ public class InventarioDAO {
                 .append("<th>Nombre del Medicamento</th><th>Cantidad Vendida</th><th>Fecha de Venta</th>")
                 .append("</tr></thead><tbody>\n");
             while (rs.next()) {
-                html.append("<tr><td>").append(rs.getString("nombre")).append("</td>")
+                String fecha = rs.getString("fechaVenta");
+                html.append("<tr><td>").append(escaparHtml(rs.getString("nombre"))).append("</td>")
                     .append("<td>").append(rs.getInt("cantidad")).append("</td>")
-                    .append("<td>").append(rs.getString("fechaVenta") != null ? rs.getString("fechaVenta") : "N/A").append("</td></tr>\n");
+                    .append("<td>").append(fecha != null ? escaparHtml(fecha) : "N/A").append("</td></tr>\n");
             }
             html.append("</tbody></table></body></html>");
-            try (FileWriter writer = new FileWriter(fileToSave)) {
-                writer.write(html.toString());
-            writer.flush();
-            }
-            JOptionPane.showMessageDialog(null, "Reporte HTML exportado con éxito en:\n" + fileToSave.getAbsolutePath());
-        } catch (Exception e) {
+            escribirArchivo(fileToSave, html.toString());
+            return true;
+        } catch (SQLException | IOException e) {
             e.printStackTrace();
-            JOptionPane.showMessageDialog(null, "Error al exportar reporte HTML: " + e.getMessage());
+            return false;
         }
     }
 
@@ -361,18 +475,7 @@ public class InventarioDAO {
      *         vacía o tiene formato inválido.
      */
     private YearMonth parsearCaducidad(String fechaCaducidad) {
-        if (fechaCaducidad == null || fechaCaducidad.isEmpty()) {
-            return null;
-        }
-        if (!fechaCaducidad.matches("\\d{4}-\\d{2}")) {
-            return null;
-        }
-        try {
-            DateTimeFormatter ymFormatter = DateTimeFormatter.ofPattern("yyyy-MM");
-            return YearMonth.parse(fechaCaducidad, ymFormatter);
-        } catch (DateTimeParseException e) {
-            return null;
-        }
+        return ReglasCaducidad.parsear(fechaCaducidad);
     }
 
     private boolean validarFechaCaducidad(String fechaCaducidad) {
@@ -416,78 +519,78 @@ public class InventarioDAO {
         try {
             ensureConnection();
 
-            // Consulta el producto por su ID
-            String selectQuery = "SELECT nombre, existencias, caducidad FROM productos WHERE id = ?";
+            if (cantidadVendida <= 0) {
+                JOptionPane.showMessageDialog(null, "La cantidad vendida debe ser mayor a cero.", "Error", JOptionPane.ERROR_MESSAGE);
+                return false;
+            }
+
+            // Consulta el producto activo por su ID
+            String nombreReal;
+            int existenciasActuales;
+            String caducidad;
+            String selectQuery = "SELECT nombre, existencias, caducidad FROM productos WHERE id = ? AND activo = 1";
             try (PreparedStatement selectStmt = connection.prepareStatement(selectQuery)) {
                 selectStmt.setInt(1, id);
-                ResultSet rs = selectStmt.executeQuery();
-
-                if (!rs.next()) {
-                    JOptionPane.showMessageDialog(null, "El producto con ID " + id + " no existe.", "Error", JOptionPane.ERROR_MESSAGE);
-                    return false;
+                try (ResultSet rs = selectStmt.executeQuery()) {
+                    if (!rs.next()) {
+                        JOptionPane.showMessageDialog(null, "El producto con ID " + id + " no existe.", "Error", JOptionPane.ERROR_MESSAGE);
+                        return false;
+                    }
+                    nombreReal = rs.getString("nombre");
+                    existenciasActuales = rs.getInt("existencias");
+                    caducidad = rs.getString("caducidad");
                 }
+            }
 
-                // Recupera el nombre real y el stock actual
-                String nombreReal = rs.getString("nombre");
-                int existenciasActuales = rs.getInt("existencias");
-                String caducidad = rs.getString("caducidad");
+            // Compara el nombre ingresado con el registrado
+            if (nombreReal == null || !nombreReal.equalsIgnoreCase(nombreIngresado)) {
+                JOptionPane.showMessageDialog(null, "El nombre ingresado no coincide con el producto registrado para el ID " + id + ".", "Error", JOptionPane.ERROR_MESSAGE);
+                return false;
+            }
 
-                // Compara el nombre ingresado con el registrado
-                if (!nombreReal.equalsIgnoreCase(nombreIngresado)) {
-                    JOptionPane.showMessageDialog(null, "El nombre ingresado no coincide con el producto registrado para el ID " + id + ".", "Error", JOptionPane.ERROR_MESSAGE);
-                    return false;
-                }
+            if (cantidadVendida > existenciasActuales) {
+                JOptionPane.showMessageDialog(null, "No hay suficientes existencias.", "Error", JOptionPane.ERROR_MESSAGE);
+                return false;
+            }
 
-                if (cantidadVendida > existenciasActuales) {
-                    JOptionPane.showMessageDialog(null, "No hay suficientes existencias.", "Error", JOptionPane.ERROR_MESSAGE);
-                    return false;
-                }
+            // [MR-003 OPC-A] Validar que el producto no esté caducado.
+            // Un producto caduca al inicio del mes siguiente al indicado en caducidad.
+            YearMonth cadYM = parsearCaducidad(caducidad);
+            if (cadYM == null) {
+                JOptionPane.showMessageDialog(null, "No se puede registrar la venta: la caducidad del producto no tiene un formato válido", "Error", JOptionPane.ERROR_MESSAGE);
+                return false;
+            }
+            if (ReglasCaducidad.estaCaducado(cadYM, LocalDate.now())) {
+                JOptionPane.showMessageDialog(null, "No se puede registrar la venta: el medicamento está caducado", "Error", JOptionPane.ERROR_MESSAGE);
+                return false;
+            }
 
-                // [MR-003 OPC-A] Validar que el producto no esté caducado.
-                // Un producto caduca al inicio del mes siguiente al indicado en caducidad.
-                YearMonth cadYM = parsearCaducidad(caducidad);
-                if (cadYM == null) {
-                    JOptionPane.showMessageDialog(null, "No se puede registrar la venta: la caducidad del producto no tiene un formato válido", "Error", JOptionPane.ERROR_MESSAGE);
-                    return false;
-                }
-                LocalDate fechaExpiracion = cadYM.plusMonths(1).atDay(1);
-                if (!LocalDate.now().isBefore(fechaExpiracion)) {
-                    JOptionPane.showMessageDialog(null, "No se puede registrar la venta: el medicamento está caducado", "Error", JOptionPane.ERROR_MESSAGE);
-                    return false;
-                }
-
-                // Inicia una transacción
-                connection.setAutoCommit(false);
-
-                // Descuenta del inventario
-                String updateQuery = "UPDATE productos SET existencias = existencias - ? WHERE id = ?";
+            // Descuento de stock y registro de la venta en una sola transacción
+            return enTransaccion(() -> {
+                String updateQuery = "UPDATE productos SET existencias = existencias - ? WHERE id = ? AND existencias >= ?";
                 try (PreparedStatement updateStmt = connection.prepareStatement(updateQuery)) {
                     updateStmt.setInt(1, cantidadVendida);
                     updateStmt.setInt(2, id);
-                    updateStmt.executeUpdate();
+                    updateStmt.setInt(3, cantidadVendida);
+                    if (updateStmt.executeUpdate() == 0) {
+                        throw new SQLException("Existencias insuficientes para el producto " + id);
+                    }
                 }
 
-                // Registrar la venta con la fecha actual
-                String fechaVenta = LocalDate.now().toString(); // Asegurar que siempre tenga una fecha válida
                 String insertHistorial = "INSERT INTO historial_ventas (idProducto, nombre, cantidad, fechaVenta) VALUES (?, ?, ?, ?)";
                 try (PreparedStatement insertStmt = connection.prepareStatement(insertHistorial)) {
                     insertStmt.setInt(1, id);
                     insertStmt.setString(2, nombreReal);
                     insertStmt.setInt(3, cantidadVendida);
-                    insertStmt.setString(4, fechaVenta);  // Se asigna la fecha actual
+                    insertStmt.setString(4, LocalDate.now().toString());
                     insertStmt.executeUpdate();
                 }
-
-                connection.commit();
                 return true;
-            }
+            });
         } catch (SQLException e) {
             e.printStackTrace();
-            try { connection.rollback(); } catch (SQLException ex) { ex.printStackTrace(); }
-        } finally {
-            try { connection.setAutoCommit(true); } catch (SQLException ex) { ex.printStackTrace(); }
+            return false;
         }
-        return false;
     }
 
 
@@ -495,21 +598,39 @@ public class InventarioDAO {
 
 
 
+    /**
+     * Edita una venta y ajusta el stock del producto por la diferencia de cantidad.
+     *
+     * <p>[FIX-009] El ajuste de stock y la actualización de la venta se hacen en una sola
+     * transacción: si cualquiera de los dos falla, no se aplica ninguno. También se valida
+     * que la cantidad sea mayor a cero y que la fecha tenga formato {@code yyyy-MM-dd}.
+     *
+     * @return {@code true} si la venta se actualizó.
+     */
     public boolean editarVenta(Object id, String nuevoNombre, String nuevaCantidad, String nuevaFecha) {
         try {
+            ensureConnection();
             int nuevaCant = Integer.parseInt(nuevaCantidad);
+            if (nuevaCant <= 0) {
+                JOptionPane.showMessageDialog(null, "La cantidad debe ser un número mayor a cero.", "Error", JOptionPane.ERROR_MESSAGE);
+                return false;
+            }
+            try {
+                LocalDate.parse(nuevaFecha, DateTimeFormatter.ISO_LOCAL_DATE);
+            } catch (DateTimeParseException | NullPointerException e) {
+                JOptionPane.showMessageDialog(null, "La fecha debe tener el formato YYYY-MM-DD y ser una fecha válida.", "Error", JOptionPane.ERROR_MESSAGE);
+                return false;
+            }
 
             // Obtener datos actuales de la venta incluyendo idProducto
-            String selectSale = "SELECT idProducto, nombre, cantidad FROM historial_ventas WHERE id = ?";
-            int idProducto = -1;
-            String oldName = null;
-            int oldQuantity = 0;
+            String selectSale = "SELECT idProducto, cantidad FROM historial_ventas WHERE id = ?";
+            int idProducto;
+            int oldQuantity;
             try (PreparedStatement ps = connection.prepareStatement(selectSale)) {
                 ps.setObject(1, id);
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
                         idProducto = rs.getInt("idProducto");
-                        oldName = rs.getString("nombre");
                         oldQuantity = rs.getInt("cantidad");
                     } else {
                         JOptionPane.showMessageDialog(null, "No se encontró la venta con id: " + id, "Error", JOptionPane.ERROR_MESSAGE);
@@ -559,28 +680,32 @@ public class InventarioDAO {
                 }
             }
 
-            // Actualizar el stock utilizando el idProducto
-            String updateStock = "UPDATE productos SET existencias = existencias - ? WHERE id = ?";
-            try (PreparedStatement psUpdate = connection.prepareStatement(updateStock)) {
-                psUpdate.setInt(1, diff);
-                psUpdate.setInt(2, idProducto);
-                int affected = psUpdate.executeUpdate();
-                if (affected == 0) {
-                    JOptionPane.showMessageDialog(null, "No se pudo actualizar el stock del producto.", "Error", JOptionPane.ERROR_MESSAGE);
-                    return false;
+            // Ajuste de stock + actualización de la venta: todo o nada
+            final int productoVenta = idProducto;
+            return enTransaccion(() -> {
+                // La condición "existencias >= ?" evita dejar stock negativo aunque cambie entre lecturas
+                String updateStock = "UPDATE productos SET existencias = existencias - ? WHERE id = ? AND existencias >= ?";
+                try (PreparedStatement psUpdate = connection.prepareStatement(updateStock)) {
+                    psUpdate.setInt(1, diff);
+                    psUpdate.setInt(2, productoVenta);
+                    psUpdate.setInt(3, Math.max(diff, 0));
+                    if (psUpdate.executeUpdate() == 0) {
+                        throw new SQLException("No se pudo actualizar el stock del producto " + productoVenta);
+                    }
                 }
-            }
 
-            // Actualizar el registro de la venta
-            String sql = "UPDATE historial_ventas SET nombre = ?, cantidad = ?, fechaVenta = ? WHERE id = ?";
-            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-                pstmt.setString(1, nuevoNombre);
-                pstmt.setInt(2, nuevaCant);
-                pstmt.setString(3, nuevaFecha);
-                pstmt.setObject(4, id);
-                int filasAfectadas = pstmt.executeUpdate();
-                return filasAfectadas > 0;
-            }
+                String sql = "UPDATE historial_ventas SET nombre = ?, cantidad = ?, fechaVenta = ? WHERE id = ?";
+                try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+                    pstmt.setString(1, nuevoNombre);
+                    pstmt.setInt(2, nuevaCant);
+                    pstmt.setString(3, nuevaFecha);
+                    pstmt.setObject(4, id);
+                    if (pstmt.executeUpdate() == 0) {
+                        throw new SQLException("La venta " + id + " ya no existe");
+                    }
+                }
+                return true;
+            });
         } catch (SQLException | NumberFormatException e) {
             e.printStackTrace();
             JOptionPane.showMessageDialog(null, "Error al editar la venta: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
@@ -591,14 +716,49 @@ public class InventarioDAO {
 
 
 
+    /**
+     * [FIX-009] Elimina una venta del historial y <b>regresa</b> la cantidad vendida al
+     * stock del producto (se trata como cancelación). Ambas operaciones van en una sola
+     * transacción.
+     *
+     * <p>Si el producto ya no existe en la tabla (ventas huérfanas de versiones anteriores
+     * que borraban productos físicamente), solo se elimina el registro de la venta.
+     *
+     * @return {@code true} si la venta existía y se eliminó.
+     */
     public boolean eliminarVenta(Object id) {
         try {
-            String sql = "DELETE FROM historial_ventas WHERE id = ?";
-            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-                pstmt.setObject(1, id);
-                int filasAfectadas = pstmt.executeUpdate();
-                return filasAfectadas > 0;
-            }
+            ensureConnection();
+            return enTransaccion(() -> {
+                int idProducto;
+                int cantidad;
+                try (PreparedStatement ps = connection.prepareStatement(
+                        "SELECT idProducto, cantidad FROM historial_ventas WHERE id = ?")) {
+                    ps.setObject(1, id);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (!rs.next()) {
+                            return false;
+                        }
+                        idProducto = rs.getInt("idProducto");
+                        cantidad = rs.getInt("cantidad");
+                    }
+                }
+
+                try (PreparedStatement ps = connection.prepareStatement(
+                        "UPDATE productos SET existencias = existencias + ? WHERE id = ?")) {
+                    ps.setInt(1, cantidad);
+                    ps.setInt(2, idProducto);
+                    ps.executeUpdate();
+                }
+
+                try (PreparedStatement ps = connection.prepareStatement("DELETE FROM historial_ventas WHERE id = ?")) {
+                    ps.setObject(1, id);
+                    if (ps.executeUpdate() == 0) {
+                        throw new SQLException("La venta " + id + " ya no existe");
+                    }
+                }
+                return true;
+            });
         } catch (SQLException e) {
             e.printStackTrace();
             return false;
@@ -645,11 +805,14 @@ public class InventarioDAO {
      *
      * <p>Columnas del reporte: ID, Nombre, Existencias, Lote, Caducidad, Fecha Entrada.
      *
+     * <p>[FIX-009] Solo productos activos; sin diálogos (la vista informa); texto escapado.
+     *
      * @param fileToSave Ruta destino del archivo {@code .html} a generar.
+     * @return {@code true} si el archivo se generó.
      */
-    public void exportarInventarioHTML(File fileToSave) {
+    public boolean exportarInventarioHTML(File fileToSave) {
         try (Statement stmt = this.connection.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT id, nombre, existencias, lote, caducidad, fechaEntrada FROM productos")) {
+             ResultSet rs = stmt.executeQuery("SELECT id, nombre, existencias, lote, caducidad, fechaEntrada FROM productos WHERE activo = 1")) {
             StringBuilder html = buildHtmlHeader("Reporte de Inventario");
             html.append("<table><thead><tr>")
                 .append("<th>ID</th><th>Nombre</th><th>Existencias</th><th>Lote</th><th>Caducidad</th><th>Fecha Entrada</th>")
@@ -657,22 +820,19 @@ public class InventarioDAO {
             while (rs.next()) {
                 html.append("<tr>")
                     .append("<td>").append(rs.getInt("id")).append("</td>")
-                    .append("<td>").append(rs.getString("nombre")).append("</td>")
+                    .append("<td>").append(escaparHtml(rs.getString("nombre"))).append("</td>")
                     .append("<td>").append(rs.getInt("existencias")).append("</td>")
-                    .append("<td>").append(rs.getString("lote")).append("</td>")
-                    .append("<td>").append(rs.getString("caducidad")).append("</td>")
-                    .append("<td>").append(rs.getString("fechaEntrada")).append("</td>")
+                    .append("<td>").append(escaparHtml(rs.getString("lote"))).append("</td>")
+                    .append("<td>").append(escaparHtml(rs.getString("caducidad"))).append("</td>")
+                    .append("<td>").append(escaparHtml(rs.getString("fechaEntrada"))).append("</td>")
                     .append("</tr>\n");
             }
             html.append("</tbody></table></body></html>");
-            try (FileWriter writer = new FileWriter(fileToSave)) {
-                writer.write(html.toString());
-            writer.flush();
-            }
-            JOptionPane.showMessageDialog(null, "Inventario HTML exportado con éxito en:\n" + fileToSave.getAbsolutePath());
-        } catch (Exception e) {
+            escribirArchivo(fileToSave, html.toString());
+            return true;
+        } catch (SQLException | IOException e) {
             e.printStackTrace();
-            JOptionPane.showMessageDialog(null, "Error al exportar el inventario: " + e.getMessage());
+            return false;
         }
     }
 
@@ -692,23 +852,15 @@ public class InventarioDAO {
     public List<Object[]> obtenerMedicamentosProximosACaducar(int diasUmbral) {
         List<Object[]> proximos = new ArrayList<>();
         try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT * FROM productos")) {
+             ResultSet rs = stmt.executeQuery("SELECT " + COLUMNAS_PRODUCTO + " FROM productos WHERE activo = 1")) {
 
             LocalDate hoy = LocalDate.now();
 
             while (rs.next()) {
                 String caducidadStr = rs.getString("caducidad"); // "yyyy-MM"
-                // [MR-003 OPC-A] Parseo seguro: omitir registros con caducidad corrupta.
-                YearMonth cadYM = parsearCaducidad(caducidadStr);
-                if (cadYM == null) {
-                    continue;
-                }
-
-                // [MR-003 OPC-A] Expira el primer día del mes siguiente al indicado.
-                LocalDate primerDiaCaducidad = cadYM.plusMonths(1).atDay(1);
-                long diasRestantes = ChronoUnit.DAYS.between(hoy, primerDiaCaducidad);
-
-                if (diasRestantes >= 0 && diasRestantes <= diasUmbral) {
+                // [MR-003 OPC-A] Registros con caducidad corrupta se omiten (estado INVALIDA).
+                // [FIX-009] El día en que expira cuenta solo como caducado, no también como próximo.
+                if (ReglasCaducidad.estado(caducidadStr, hoy, diasUmbral) == ReglasCaducidad.Estado.PROXIMO) {
                     int id = rs.getInt("id");
                     String nombre = rs.getString("nombre");
                     int existencias = rs.getInt("existencias");
@@ -738,21 +890,14 @@ public class InventarioDAO {
     public List<Object[]> obtenerMedicamentosCaducados() {
         List<Object[]> caducados = new ArrayList<>();
         try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT * FROM productos")) {
+             ResultSet rs = stmt.executeQuery("SELECT " + COLUMNAS_PRODUCTO + " FROM productos WHERE activo = 1")) {
 
             LocalDate hoy = LocalDate.now();
 
             while (rs.next()) {
                 String caducidadStr = rs.getString("caducidad"); // "yyyy-MM"
-                // [MR-003 OPC-A] Parseo seguro: omitir registros con caducidad corrupta.
-                YearMonth cadYM = parsearCaducidad(caducidadStr);
-                if (cadYM == null) {
-                    continue;
-                }
-                // [MR-003 OPC-A] Expira el primer día del mes siguiente al indicado.
-                LocalDate primerDiaCaducidad = cadYM.plusMonths(1).atDay(1);
-
-                if (primerDiaCaducidad.isBefore(hoy) || primerDiaCaducidad.isEqual(hoy)) {
+                // [MR-003 OPC-A] Registros con caducidad corrupta se omiten (estado INVALIDA).
+                if (ReglasCaducidad.estado(caducidadStr, hoy, ReglasCaducidad.DIAS_ALERTA) == ReglasCaducidad.Estado.CADUCADO) {
                     int id = rs.getInt("id");
                     String nombre = rs.getString("nombre");
                     int existencias = rs.getInt("existencias");
@@ -777,7 +922,7 @@ public class InventarioDAO {
      * @return {@code true} si el mes actual es posterior al mes de caducidad; {@code false} en caso contrario
      */
     private boolean estaCaducado(YearMonth cad) {
-        return YearMonth.now().isAfter(cad);
+        return ReglasCaducidad.estaCaducado(cad, LocalDate.now());
     }
 
     /**
@@ -794,7 +939,7 @@ public class InventarioDAO {
     public boolean separarProducto(int id, String fechaSeparado) {
         try {
             ensureConnection();
-            String selectSql = "SELECT nombre, caducidad, existencias FROM productos WHERE id = ?";
+            String selectSql = "SELECT nombre, caducidad, existencias FROM productos WHERE id = ? AND activo = 1";
             try (PreparedStatement selectStmt = connection.prepareStatement(selectSql)) {
                 selectStmt.setInt(1, id);
                 try (ResultSet rs = selectStmt.executeQuery()) {
@@ -841,7 +986,7 @@ public class InventarioDAO {
     public List<Object[]> obtenerProductosApartados() {
         List<Object[]> apartados = new ArrayList<>();
         try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT * FROM productos WHERE fecha_separado IS NOT NULL AND fecha_separado <> ''")) {
+             ResultSet rs = stmt.executeQuery("SELECT " + COLUMNAS_PRODUCTO + " FROM productos WHERE activo = 1 AND fecha_separado IS NOT NULL AND fecha_separado <> ''")) {
             int columnCount = rs.getMetaData().getColumnCount();
             while (rs.next()) {
                 Object[] row = new Object[columnCount];
@@ -867,11 +1012,14 @@ public class InventarioDAO {
      * <p>Columnas del reporte: ID, Nombre, Existencias, Lote, Caducidad, Fecha Entrada,
      * Fecha Apartado.
      *
+     * <p>[FIX-009] Solo productos activos; sin diálogos (la vista informa); texto escapado.
+     *
      * @param fileToSave Ruta destino del archivo {@code .html} a generar.
+     * @return {@code true} si el archivo se generó.
      */
-    public void exportarApartadosHTML(File fileToSave) {
+    public boolean exportarApartadosHTML(File fileToSave) {
         try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT id, nombre, existencias, lote, caducidad, fechaEntrada, fecha_separado FROM productos WHERE fecha_separado IS NOT NULL AND fecha_separado <> ''")) {
+             ResultSet rs = stmt.executeQuery("SELECT id, nombre, existencias, lote, caducidad, fechaEntrada, fecha_separado FROM productos WHERE activo = 1 AND fecha_separado IS NOT NULL AND fecha_separado <> ''")) {
             StringBuilder html = buildHtmlHeader("Reporte de Apartados");
             html.append("<table><thead><tr>")
                 .append("<th>ID</th><th>Nombre</th><th>Existencias</th><th>Lote</th><th>Caducidad</th><th>Fecha Entrada</th><th>Fecha Apartado</th>")
@@ -879,37 +1027,39 @@ public class InventarioDAO {
             while (rs.next()) {
                 html.append("<tr>")
                     .append("<td>").append(rs.getInt("id")).append("</td>")
-                    .append("<td>").append(rs.getString("nombre")).append("</td>")
+                    .append("<td>").append(escaparHtml(rs.getString("nombre"))).append("</td>")
                     .append("<td>").append(rs.getInt("existencias")).append("</td>")
-                    .append("<td>").append(rs.getString("lote")).append("</td>")
-                    .append("<td>").append(rs.getString("caducidad")).append("</td>")
-                    .append("<td>").append(rs.getString("fechaEntrada")).append("</td>")
-                    .append("<td>").append(rs.getString("fecha_separado")).append("</td>")
+                    .append("<td>").append(escaparHtml(rs.getString("lote"))).append("</td>")
+                    .append("<td>").append(escaparHtml(rs.getString("caducidad"))).append("</td>")
+                    .append("<td>").append(escaparHtml(rs.getString("fechaEntrada"))).append("</td>")
+                    .append("<td>").append(escaparHtml(rs.getString("fecha_separado"))).append("</td>")
                     .append("</tr>\n");
             }
             html.append("</tbody></table></body></html>");
-            try (FileWriter writer = new FileWriter(fileToSave)) {
-                writer.write(html.toString());
-            writer.flush();
-            }
-            JOptionPane.showMessageDialog(null, "Apartados HTML exportado con éxito en:\n" + fileToSave.getAbsolutePath());
-        } catch (Exception e) {
+            escribirArchivo(fileToSave, html.toString());
+            return true;
+        } catch (SQLException | IOException e) {
             e.printStackTrace();
-            JOptionPane.showMessageDialog(null, "Error al exportar apartados: " + e.getMessage());
+            return false;
         }
     }
 
 
+    /**
+     * [FIX-009] Resuelve un nombre al ID del mejor lote (ver
+     * {@link #buscarProductoPorIdONombre(String)}).
+     *
+     * @return el ID, o {@code -1} si no hay ningún producto activo con ese nombre.
+     */
     public int obtenerProductoIdPorNombre(String nombre) {
+        if (nombre == null || nombre.trim().isEmpty()) {
+            return -1;
+        }
         try {
             ensureConnection();
-            String sql = "SELECT id FROM productos WHERE nombre = ?";
-            try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-                stmt.setString(1, nombre);
-                ResultSet rs = stmt.executeQuery();
-                if (rs.next()) {
-                    return rs.getInt("id");
-                }
+            Object[] producto = buscarMejorLotePorNombre(nombre.trim());
+            if (producto != null) {
+                return (int) producto[0];
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -918,50 +1068,89 @@ public class InventarioDAO {
     }
 
     /**
-     * [MR-002 – OPC-A] Busca un producto por ID numérico exacto o por nombre exacto.
+     * [MR-002 – OPC-A] Busca un producto por ID numérico exacto o por nombre completo.
      *
      * <p>Estrategia de búsqueda:
      * <ol>
-     *   <li>Intenta parsear {@code dato} como entero; si lo logra, ejecuta
-     *       {@code SELECT id, nombre FROM productos WHERE id = ?}.</li>
-     *   <li>Si el parseo falla ({@link NumberFormatException}) o no hay resultado,
-     *       ejecuta {@code SELECT id, nombre FROM productos WHERE nombre = ?}
-     *       (coincidencia exacta, sin comodines).</li>
+     *   <li>Si {@code dato} es un entero, busca el producto activo con ese ID
+     *       (el usuario eligió un lote concreto).</li>
+     *   <li>Si no es número o no hay resultado, busca por nombre completo
+     *       (sin comodines). [FIX-009] La comparación ignora mayúsculas/minúsculas y,
+     *       si hay varios lotes con el mismo nombre, devuelve el lote <b>vendible</b>
+     *       (con existencias y sin caducar) que caduca primero (FEFO). Si ningún lote es
+     *       vendible, devuelve el primero que coincida para que la venta o el apartado
+     *       muestre el motivo concreto (caducado o sin existencias).</li>
      * </ol>
      *
      * @param dato Cadena ingresada por el usuario; puede ser un ID numérico o
-     *             el nombre exacto del medicamento.
+     *             el nombre completo del medicamento.
      * @return {@code Object[]{id, nombre}} si se encuentra el producto,
      *         {@code null} si no existe ninguna coincidencia.
      */
     public Object[] buscarProductoPorIdONombre(String dato) {
+        if (dato == null || dato.trim().isEmpty()) {
+            return null;
+        }
+        String texto = dato.trim();
         try {
             ensureConnection();
             try {
-                int id = Integer.parseInt(dato.trim());
-                String sql = "SELECT id, nombre FROM productos WHERE id = ?";
+                int id = Integer.parseInt(texto);
+                String sql = "SELECT id, nombre FROM productos WHERE id = ? AND activo = 1";
                 try (PreparedStatement stmt = connection.prepareStatement(sql)) {
                     stmt.setInt(1, id);
-                    ResultSet rs = stmt.executeQuery();
-                    if (rs.next()) {
-                        return new Object[]{rs.getInt("id"), rs.getString("nombre")};
+                    try (ResultSet rs = stmt.executeQuery()) {
+                        if (rs.next()) {
+                            return new Object[]{rs.getInt("id"), rs.getString("nombre")};
+                        }
                     }
                 }
             } catch (NumberFormatException e) {
-                // El dato no es un número; buscar por nombre exacto
+                // El dato no es un número; buscar por nombre
             }
-            String sql = "SELECT id, nombre FROM productos WHERE nombre = ?";
-            try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-                stmt.setString(1, dato.trim());
-                ResultSet rs = stmt.executeQuery();
-                if (rs.next()) {
-                    return new Object[]{rs.getInt("id"), rs.getString("nombre")};
-                }
-            }
+            return buscarMejorLotePorNombre(texto);
         } catch (SQLException e) {
             e.printStackTrace();
         }
         return null;
+    }
+
+    /**
+     * [FIX-009] Entre los productos activos cuyo nombre coincide (sin distinguir
+     * mayúsculas), elige el lote vendible que caduca primero; si ninguno es vendible,
+     * el primero que coincida.
+     *
+     * <p>La comparación se hace en Java porque {@code lower()} de SQLite solo maneja ASCII
+     * (no iguala "Á" con "á").
+     */
+    private Object[] buscarMejorLotePorNombre(String nombre) throws SQLException {
+        String sql = "SELECT id, nombre, existencias, caducidad FROM productos WHERE activo = 1 ORDER BY id";
+        LocalDate hoy = LocalDate.now();
+        Object[] mejor = null;
+        YearMonth caducidadMejor = null;
+        Object[] primeraCoincidencia = null;
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            while (rs.next()) {
+                String nombreProducto = rs.getString("nombre");
+                if (nombreProducto == null || !nombreProducto.trim().equalsIgnoreCase(nombre)) {
+                    continue;
+                }
+                Object[] fila = {rs.getInt("id"), nombreProducto};
+                if (primeraCoincidencia == null) {
+                    primeraCoincidencia = fila;
+                }
+                YearMonth caducidad = ReglasCaducidad.parsear(rs.getString("caducidad"));
+                boolean vendible = rs.getInt("existencias") > 0
+                        && caducidad != null
+                        && !ReglasCaducidad.estaCaducado(caducidad, hoy);
+                if (vendible && (mejor == null || caducidad.isBefore(caducidadMejor))) {
+                    mejor = fila;
+                    caducidadMejor = caducidad;
+                }
+            }
+        }
+        return mejor != null ? mejor : primeraCoincidencia;
     }
 
 

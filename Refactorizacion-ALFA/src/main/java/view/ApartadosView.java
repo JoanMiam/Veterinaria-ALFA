@@ -11,9 +11,6 @@ import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionAdapter;
 import java.io.File;
 import java.time.LocalDate;
-import java.time.YearMonth;
-import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 import javax.swing.BorderFactory;
@@ -31,6 +28,7 @@ import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableRowSorter;
 
 import controller.InventarioController;
+import model.ReglasCaducidad;
 
 public class ApartadosView extends JDialog {
     private InventarioController controller;
@@ -94,6 +92,7 @@ public class ApartadosView extends JDialog {
 
         rowSorter = new TableRowSorter<>(model);
         table.setRowSorter(rowSorter);
+        configurarOrdenacion(); // [FIX-009] existencias se ordenaba como texto ("10" < "9")
 
         JScrollPane scrollPane = new JScrollPane(table);
         add(scrollPane, BorderLayout.CENTER);
@@ -103,7 +102,7 @@ public class ApartadosView extends JDialog {
         JButton btnRegistrar = createButton("Registrar Apartado");
         JButton btnEliminar = createButton("Eliminar"); // Se asigna el rojo desde createButton
         JButton btnRefrescar = createButton("Refrescar");
-        JButton btnExportar = createButton("Exportar a Excel");
+        JButton btnExportar = createButton("Exportar reporte");
 
         buttonPanel.add(btnRegistrar);
         buttonPanel.add(btnEliminar);
@@ -128,7 +127,7 @@ public class ApartadosView extends JDialog {
             int selection = fileChooser.showSaveDialog(this);
             if (selection == JFileChooser.APPROVE_OPTION) {
                 File file = fileChooser.getSelectedFile();
-                controller.exportarApartadosCSV(file);
+                MensajesExportacion.mostrarResultado(this, controller.exportarApartadosCSV(file), file);
             }
         });
         btnEditarApartado.addActionListener(e -> editarApartado());
@@ -318,26 +317,17 @@ public class ApartadosView extends JDialog {
 
             // Columna 4 -> "Caducidad", con formato "yyyy-MM"
             if (column == 4 && value != null) {
-                try {
-                    DateTimeFormatter ymFormatter = DateTimeFormatter.ofPattern("yyyy-MM");
-                    YearMonth cadYM = YearMonth.parse(value.toString(), ymFormatter);
+                // [FIX-009] Misma regla que el DAO y el inventario (ReglasCaducidad).
+                ReglasCaducidad.Estado estado = ReglasCaducidad.estado(
+                        value.toString(), LocalDate.now(), ReglasCaducidad.DIAS_ALERTA);
 
-                    YearMonth hoyYM = YearMonth.now();
-                    LocalDate hoy = LocalDate.now();
-                    LocalDate expiryDate = cadYM.plusMonths(1).atDay(1);
-                    long diasHastaExpiry = ChronoUnit.DAYS.between(hoy, expiryDate);
-
-                    if (hoyYM.isAfter(cadYM)) {
-                        c.setBackground(new Color(255, 0, 0)); // Rojo fuerte (ya caducado)
-                    } else if (diasHastaExpiry <= 30) {
-                        c.setBackground(new Color(255, 153, 153)); // Rojo claro (próximo a caducar)
-                    } else if (row == hoveredRow && !isSelected) {
-                        c.setBackground(new Color(220, 240, 255)); // Hover
-                    } else {
-                        c.setBackground(isSelected ? table.getSelectionBackground() : table.getBackground());
-                    }
-                } catch (Exception e) {
-                    // Si falla el parseo o la columna no tiene el formato esperado
+                if (estado == ReglasCaducidad.Estado.CADUCADO) {
+                    c.setBackground(new Color(255, 0, 0)); // Rojo fuerte (ya caducado)
+                } else if (estado == ReglasCaducidad.Estado.PROXIMO) {
+                    c.setBackground(new Color(255, 153, 153)); // Rojo claro (próximo a caducar)
+                } else if (row == hoveredRow && !isSelected) {
+                    c.setBackground(new Color(220, 240, 255)); // Hover
+                } else {
                     c.setBackground(isSelected ? table.getSelectionBackground() : table.getBackground());
                 }
             } else {

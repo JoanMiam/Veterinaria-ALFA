@@ -73,5 +73,6 @@
     <maven.compiler.target>21</maven.compiler.target>
     <maven.compiler.source>21</maven.compiler.source>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <argLine>-Djava.awt.headless=true</argLine>
   </properties>
 </project>
