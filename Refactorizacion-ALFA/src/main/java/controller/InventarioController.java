@@ -1,191 +1,224 @@
 package controller;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
 
+import model.ConfiguracionVeterinaria;
 import model.InventarioDAO;
+import model.OperacionRechazadaException;
+import model.Producto;
+import model.ReportesHtml;
+import model.Venta;
 
+/**
+ * [MR-010] Capa de servicio entre las vistas y el DAO.
+ *
+ * <ul>
+ *   <li>Expone operaciones con tipos de dominio ({@link Producto}, {@link Venta},
+ *       {@link YearMonth}, {@link LocalDate}) en lugar de cadenas y {@code Object[]}.</li>
+ *   <li>Las reglas de negocio no cumplidas llegan como {@link OperacionRechazadaException};
+ *       la vista muestra el mensaje.</li>
+ *   <li>Tras cada cambio que afecta al inventario avisa a los suscriptores
+ *       ({@link #alCambiarInventario(Runnable)}), en lugar de llamar directamente a la vista.</li>
+ *   <li>Genera los reportes HTML ({@link ReportesHtml}) y los escribe en disco.</li>
+ * </ul>
+ */
 public class InventarioController {
-    private InventarioDAO dao;
-    private view.InventarioView inventarioView;
+
+    private final InventarioDAO dao;
+    private final List<Runnable> suscriptores = new CopyOnWriteArrayList<>();
 
     public InventarioController(InventarioDAO dao) {
-        this.dao = dao;
+        this.dao = Objects.requireNonNull(dao, "dao");
     }
 
-    public void setInventarioView(view.InventarioView inventarioView) {
-        this.inventarioView = inventarioView;
+    /** Registra una acción a ejecutar cada vez que cambia el inventario (stock, productos, apartados). */
+    public void alCambiarInventario(Runnable accion) {
+        suscriptores.add(Objects.requireNonNull(accion, "accion"));
     }
 
-    // Gestión de productos
-    public boolean agregarProducto(String nombre, String existencias, String lote, String caducidad) {
-        boolean result = dao.agregarProducto(nombre, existencias, lote, caducidad);
-        if (result && inventarioView != null) {
-            inventarioView.cargarDatos();
-        }
-        return result;
+    private void notificarCambio() {
+        suscriptores.forEach(Runnable::run);
     }
 
-    public boolean eliminarProducto(int id) {
-        boolean result = dao.eliminarProducto(id);
-        if (result && inventarioView != null) {
-            inventarioView.cargarDatos();
-        }
-        return result;
-    }
+    // =========================================================================
+    // Productos
+    // =========================================================================
 
-    public boolean editarProducto(int id,
-                                  String nombre,
-                                  String existencias,
-                                  String lote,
-                                  String caducidad,
-                                  String fechaEntrada) {
-        boolean result = dao.editarProducto(id, nombre, existencias, lote, caducidad, fechaEntrada);
-        if (result && inventarioView != null) {
-            inventarioView.cargarDatos();
-        }
-        return result;
-    }
-
-
-    public boolean registrarVenta(int id, String nombre, int cantidad) {
-        boolean result = dao.registrarVenta(id, nombre, cantidad);
-        if (result && inventarioView != null) {
-            inventarioView.actualizarTabla();
-        }
-        return result;
-    }
-
-
-
-
-
-    public boolean editarVenta(Object id, String nuevoNombre, String nuevaCantidad, String nuevaFecha) {
-        boolean result = dao.editarVenta(id, nuevoNombre, nuevaCantidad, nuevaFecha);
-        if (result && inventarioView != null) {
-            inventarioView.cargarDatos();  // Actualiza la vista de inventario para reflejar el stock actualizado.
-        }
-        return result;
-    }
-
-
-    /** [FIX-009] Al eliminar una venta se regresa su cantidad al stock: se refresca el inventario. */
-    public boolean eliminarVenta(Object id) {
-        boolean result = dao.eliminarVenta(id);
-        if (result && inventarioView != null) {
-            inventarioView.cargarDatos();
-        }
-        return result;
-    }
-
-    public Object[][] obtenerProductos() {
+    public List<Producto> obtenerProductos() {
         return dao.obtenerProductos();
     }
 
-    public List<Object[]> obtenerHistorialVentas() {
-        return dao.obtenerHistorialVentas();
+    public Producto agregarProducto(String nombre, int existencias, String lote, YearMonth caducidad)
+            throws OperacionRechazadaException {
+        Producto creado = dao.agregarProducto(nombre, existencias, lote, caducidad);
+        notificarCambio();
+        return creado;
     }
 
-    /** [MR-005 – OPC-A] Delega la generación del reporte HTML de ventas al DAO. */
-    public boolean exportarCSV(File fileToSave) {
-        return dao.exportarVentasHTML(fileToSave);
+    public void editarProducto(int id, String nombre, int existencias, String lote,
+                               YearMonth caducidad, LocalDate fechaEntrada) throws OperacionRechazadaException {
+        dao.editarProducto(id, nombre, existencias, lote, caducidad, fechaEntrada);
+        notificarCambio();
     }
 
-    /** [MR-005 – OPC-A] Delega la generación del reporte HTML del inventario al DAO. */
-    public boolean exportarInventarioCSV(File fileToSave) {
-        return dao.exportarInventarioHTML(fileToSave);
+    /**
+     * Elimina (oculta) varios productos. Continúa aunque alguno falle.
+     *
+     * @return mensajes de los productos que no se pudieron eliminar (vacío si todos se eliminaron).
+     */
+    public List<String> eliminarProductos(List<Integer> ids) {
+        List<String> errores = new ArrayList<>();
+        for (int id : ids) {
+            try {
+                dao.eliminarProducto(id);
+            } catch (OperacionRechazadaException e) {
+                errores.add(e.getMessage());
+            }
+        }
+        notificarCambio();
+        return errores;
     }
 
+    /** [MR-002] Busca por ID exacto o nombre completo (FEFO entre lotes del mismo nombre). */
+    public Optional<Producto> buscarProducto(String idONombre) {
+        return dao.buscarProductoPorIdONombre(idONombre);
+    }
 
-    // Método agregado para obtener medicamentos próximos a caducar
-    public List<Object[]> obtenerMedicamentosProximosACaducar(int diasUmbral) {
+    public List<Producto> obtenerMedicamentosProximosACaducar(int diasUmbral) {
         return dao.obtenerMedicamentosProximosACaducar(diasUmbral);
     }
 
-    public List<Object[]> obtenerMedicamentosCaducados() {
+    public List<Producto> obtenerMedicamentosCaducados() {
         return dao.obtenerMedicamentosCaducados();
     }
 
+    // =========================================================================
+    // Ventas
+    // =========================================================================
 
-    public boolean separarProducto(int id, String fechaSeparado) {
-        boolean result = dao.separarProducto(id, fechaSeparado);
-        if (result && inventarioView != null) {
-            inventarioView.cargarDatos();
-        }
-        return result;
+    public List<Venta> obtenerHistorialVentas() {
+        return dao.obtenerHistorialVentas();
     }
 
-    public List<Object[]> obtenerProductosApartados() {
+    /**
+     * [MR-002] Busca el medicamento por ID o nombre y registra la venta.
+     *
+     * @throws OperacionRechazadaException si no se encuentra el medicamento o la venta no procede.
+     */
+    public Venta registrarVenta(String idONombre, int cantidad) throws OperacionRechazadaException {
+        Producto producto = buscarProducto(idONombre)
+                .orElseThrow(() -> new OperacionRechazadaException(
+                        "No se encontró ningún medicamento con el ID o nombre ingresado."));
+        Venta venta = dao.registrarVenta(producto.id(), cantidad);
+        notificarCambio();
+        return venta;
+    }
+
+    public void editarVenta(int idVenta, int nuevaCantidad, LocalDate nuevaFecha) throws OperacionRechazadaException {
+        dao.editarVenta(idVenta, nuevaCantidad, nuevaFecha);
+        notificarCambio();
+    }
+
+    /**
+     * [FIX-009] Elimina ventas regresando su cantidad al stock. Continúa aunque alguna falle.
+     *
+     * @return mensajes de las ventas que no se pudieron eliminar.
+     */
+    public List<String> eliminarVentas(List<Integer> ids) {
+        List<String> errores = new ArrayList<>();
+        for (int id : ids) {
+            try {
+                dao.eliminarVenta(id);
+            } catch (OperacionRechazadaException e) {
+                errores.add(e.getMessage());
+            }
+        }
+        notificarCambio();
+        return errores;
+    }
+
+    // =========================================================================
+    // Apartados
+    // =========================================================================
+
+    public List<Producto> obtenerProductosApartados() {
         return dao.obtenerProductosApartados();
     }
 
-    /** [MR-005 – OPC-A] Delega la generación del reporte HTML de apartados al DAO. */
-    public boolean exportarApartadosCSV(File fileToSave) {
-        return dao.exportarApartadosHTML(fileToSave);
+    /**
+     * [MR-004] Busca el medicamento por ID o nombre y registra el apartado.
+     *
+     * @throws OperacionRechazadaException si no se encuentra el medicamento o el apartado no procede.
+     */
+    public void apartarProducto(String idONombre, LocalDate fecha) throws OperacionRechazadaException {
+        Producto producto = buscarProducto(idONombre)
+                .orElseThrow(() -> new OperacionRechazadaException(
+                        "No se encontró el producto con el dato proporcionado."));
+        dao.separarProducto(producto.id(), fecha);
+        notificarCambio();
     }
 
-    /**
-     * [MR-005 – OPC-A] Persiste la configuración de la veterinaria delegando al DAO.
-     *
-     * @param logo      Logotipo en Base64 (puede ser {@code null}).
-     * @param nombre    Nombre de la clínica.
-     * @param direccion Dirección física.
-     * @param telefono  Teléfono de contacto.
-     * @param rfc       RFC de la clínica.
-     * @param horarios  Horarios de atención.
-     */
-    public void guardarConfiguracion(String logo, String nombre, String direccion,
-                                     String telefono, String rfc, String horarios) {
-        dao.guardarConfiguracion(logo, nombre, direccion, telefono, rfc, horarios);
+    public void editarApartado(int idProducto, LocalDate nuevaFecha) throws OperacionRechazadaException {
+        dao.editarApartado(idProducto, nuevaFecha);
+        notificarCambio();
     }
 
-    /**
-     * [MR-005 – OPC-A] Recupera la configuración de la veterinaria desde el DAO.
-     *
-     * @return Arreglo {@code {logo, nombre, direccion, telefono, rfc, horarios}} o
-     *         {@code null} si no existe configuración guardada.
-     */
-    public Object[] obtenerConfiguracion() {
+    /** @return mensajes de los apartados que no se pudieron eliminar. */
+    public List<String> eliminarApartados(List<Integer> idsProducto) {
+        List<String> errores = new ArrayList<>();
+        for (int id : idsProducto) {
+            try {
+                dao.eliminarApartado(id);
+            } catch (OperacionRechazadaException e) {
+                errores.add(e.getMessage());
+            }
+        }
+        notificarCambio();
+        return errores;
+    }
+
+    // =========================================================================
+    // Configuración y reportes
+    // =========================================================================
+
+    public Optional<ConfiguracionVeterinaria> obtenerConfiguracion() {
         return dao.obtenerConfiguracion();
     }
 
-    public int obtenerProductoIdPorNombre(String dato) {
-        return dao.obtenerProductoIdPorNombre(dato);
+    public void guardarConfiguracion(ConfiguracionVeterinaria config) throws OperacionRechazadaException {
+        dao.guardarConfiguracion(config);
     }
 
-    /**
-     * [MR-002 – OPC-A] Wrapper que delega la búsqueda unificada al DAO.
-     *
-     * <p>Permite a la vista obtener el {@code id} y {@code nombre} reales de un
-     * producto ingresando únicamente un ID numérico o el nombre exacto del
-     * medicamento, sin necesidad de conocer la lógica de acceso a datos.
-     *
-     * @param dato Cadena ingresada por el usuario (ID numérico o nombre exacto).
-     * @return {@code Object[]{id, nombre}} si el producto existe,
-     *         {@code null} si no se encontró ninguna coincidencia.
-     * @see model.InventarioDAO#buscarProductoPorIdONombre(String)
-     */
-    public Object[] buscarProductoPorIdONombre(String dato) {
-        return dao.buscarProductoPorIdONombre(dato);
+    /** [MR-005] Escribe el reporte HTML del inventario (productos activos). */
+    public void exportarInventario(File destino) throws IOException {
+        escribir(destino, ReportesHtml.inventario(dao.obtenerProductos(), configuracionOnull()));
     }
 
-
-    public boolean eliminarApartado(int id) {
-        boolean result = dao.eliminarApartado(id);
-        if (result && inventarioView != null) {
-            inventarioView.cargarDatos();
-        }
-        return result;
+    /** [MR-005] Escribe el reporte HTML del historial de ventas. */
+    public void exportarVentas(File destino) throws IOException {
+        escribir(destino, ReportesHtml.ventas(dao.obtenerHistorialVentas(), configuracionOnull()));
     }
 
-    public boolean editarApartado(int id, String nuevaFechaApartado) {
-        boolean result = dao.editarApartado(id, nuevaFechaApartado);
-        if (result && inventarioView != null) {
-            inventarioView.cargarDatos();
-        }
-        return result;
+    /** [MR-005] Escribe el reporte HTML de los productos apartados. */
+    public void exportarApartados(File destino) throws IOException {
+        escribir(destino, ReportesHtml.apartados(dao.obtenerProductosApartados(), configuracionOnull()));
     }
 
+    private ConfiguracionVeterinaria configuracionOnull() {
+        return dao.obtenerConfiguracion().orElse(null);
+    }
 
-
+    private static void escribir(File destino, String html) throws IOException {
+        Files.writeString(destino.toPath(), html, StandardCharsets.UTF_8);
+    }
 }

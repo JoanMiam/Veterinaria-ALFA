@@ -36,3 +36,9 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+### Generados / datos locales de la app ###
+dependency-reduced-pom.xml
+config.properties
+db/
+logs/

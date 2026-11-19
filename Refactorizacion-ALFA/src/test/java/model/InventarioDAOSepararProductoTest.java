@@ -1,205 +1,100 @@
 package model;
 
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.sql.SQLException;
-import java.sql.Statement;
-import java.time.YearMonth;
-import java.time.format.DateTimeFormatter;
+import java.time.LocalDate;
 
 import org.junit.jupiter.api.AfterEach;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import prueba.BdPrueba;
+
 /**
- * PRU-004-01 — Pruebas Unitarias: validación de caducidad y existencias en
- * separarProducto y método auxiliar estaCaducado (MR-004).
+ * PRU-004-01 — Validación de caducidad y existencias en separarProducto (MR-004, MR-008).
  *
- * <p>Usa SQLite en memoria para aislamiento total. Los flujos que invocan
- * JOptionPane en entorno headless lanzan HeadlessException; en esos casos
- * la prueba valida el estado de la BD en lugar del valor de retorno.
+ * <p>[MR-010] Los rechazos se verifican con {@link OperacionRechazadaException}.
  */
 @DisplayName("PRU-004-01 | InventarioDAO — validación en separarProducto (MR-004)")
 class InventarioDAOSepararProductoTest {
 
-    private Connection connection;
+    private static final LocalDate FECHA = LocalDate.of(2026, 5, 18);
+
+    private BdPrueba bd;
     private InventarioDAO dao;
-
-    private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM");
-
-    // -------------------------------------------------------------------------
-    // Ciclo de vida
-    // -------------------------------------------------------------------------
 
     @BeforeEach
     void setUp() throws SQLException {
-        connection = DriverManager.getConnection("jdbc:sqlite::memory:");
-        crearEsquema();
-        dao = new InventarioDAO(connection);
+        bd = BdPrueba.nueva();
+        dao = bd.dao;
     }
 
     @AfterEach
     void tearDown() throws SQLException {
-        if (connection != null && !connection.isClosed()) connection.close();
+        bd.close();
     }
-
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
-
-    private void crearEsquema() throws SQLException {
-        try (Statement stmt = connection.createStatement()) {
-            stmt.execute(
-                "CREATE TABLE IF NOT EXISTS productos (" +
-                "id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT, " +
-                "existencias INTEGER, lote TEXT, caducidad TEXT, " +
-                "fechaEntrada TEXT, fecha_separado TEXT)"
-            );
-        }
-    }
-
-    private int insertarProducto(String nombre, int existencias, String caducidad) throws SQLException {
-        String sql = "INSERT INTO productos (nombre, existencias, lote, caducidad, fechaEntrada) VALUES (?, ?, ?, ?, ?)";
-        try (PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            ps.setString(1, nombre);
-            ps.setInt(2, existencias);
-            ps.setString(3, "L-TEST");
-            ps.setString(4, caducidad);
-            ps.setString(5, "2025-01-01");
-            ps.executeUpdate();
-            ResultSet keys = ps.getGeneratedKeys();
-            return keys.next() ? keys.getInt(1) : -1;
-        }
-    }
-
-    private String fechaSeparadoEnBD(int id) throws SQLException {
-        try (PreparedStatement ps = connection.prepareStatement(
-                "SELECT fecha_separado FROM productos WHERE id = ?")) {
-            ps.setInt(1, id);
-            ResultSet rs = ps.executeQuery();
-            return rs.next() ? rs.getString("fecha_separado") : null;
-        }
-    }
-
-    /** Caducidad que ya expiró (mes de hace 2 meses). */
-    private String caducidadExpirada() {
-        return YearMonth.now().minusMonths(2).format(FMT);
-    }
-
-    /** Caducidad = mes actual → producto aún vigente hasta que el mes pase. */
-    private String caducidadMesActual() {
-        return YearMonth.now().format(FMT);
-    }
-
-    /** Caducidad en 3 meses → producto claramente vigente. */
-    private String caducidadFutura() {
-        return YearMonth.now().plusMonths(3).format(FMT);
-    }
-
-    // =========================================================================
-    // TC-01: Producto vigente + existencias > 0 → retorna true y registra apartado
-    // =========================================================================
 
     @Test
-    @DisplayName("TC-01: Producto vigente con existencias → separarProducto retorna true y registra fecha_separado")
-    void tc01_productoVigente_conExistencias_retornaTrueYRegistra() throws SQLException {
-        int id = insertarProducto("Amoxicilina", 10, caducidadFutura());
+    @DisplayName("TC-01: Producto vigente con existencias → apartado registrado")
+    void tc01_productoVigente_conExistencias_registra() throws SQLException {
+        int id = bd.insertarProducto("Amoxicilina", 10, BdPrueba.mes(3));
 
-        boolean resultado = dao.separarProducto(id, "2026-05-18");
+        assertDoesNotThrow(() -> dao.separarProducto(id, FECHA));
 
-        assertTrue(resultado, "Producto vigente con existencias debe poder apartarse");
-        assertEquals("2026-05-18", fechaSeparadoEnBD(id),
-            "fecha_separado debe quedar registrada en la BD tras el apartado exitoso");
+        assertEquals("2026-05-18", bd.fechaApartado(id));
     }
 
-    // =========================================================================
-    // TC-02: Producto caducado (mes ya pasó) → sin apartado en BD
-    // =========================================================================
-
     @Test
-    @DisplayName("TC-02: Producto caducado (mes ya pasó) → separarProducto no registra apartado")
-    void tc02_productoCaducado_noRegistraApartado() throws SQLException {
-        int id = insertarProducto("Ibuprofeno", 5, caducidadExpirada());
+    @DisplayName("TC-02: Producto caducado → apartado rechazado")
+    void tc02_productoCaducado_rechazado() throws SQLException {
+        int id = bd.insertarProducto("Ibuprofeno", 5, BdPrueba.mes(-2));
 
-        try {
-            dao.separarProducto(id, "2026-05-18");
-        } catch (Exception ignored) {
-            // HeadlessException esperada en entorno sin GUI; lo relevante es el estado de la BD
-        }
+        OperacionRechazadaException e = assertThrows(OperacionRechazadaException.class,
+                () -> dao.separarProducto(id, FECHA));
 
-        assertNull(fechaSeparadoEnBD(id),
-            "Producto caducado no debe tener fecha_separado registrada");
+        assertTrue(e.getMessage().contains("caducado"), e.getMessage());
+        assertNull(bd.fechaApartado(id));
     }
 
-    // =========================================================================
-    // TC-03: Caducidad = mes actual → vigente, apartado permitido
-    // =========================================================================
-
     @Test
-    @DisplayName("TC-03: Caducidad = mes actual → producto aún vigente, separarProducto retorna true")
-    void tc03_caducidadMesActual_productoVigente_retornaTrue() throws SQLException {
-        int id = insertarProducto("Paracetamol", 20, caducidadMesActual());
+    @DisplayName("TC-03: Caducidad = mes actual → producto aún vigente, apartado permitido")
+    void tc03_caducidadMesActual_permitido() throws SQLException {
+        int id = bd.insertarProducto("Paracetamol", 20, BdPrueba.mes(0));
 
-        boolean resultado = dao.separarProducto(id, "2026-05-18");
-
-        assertTrue(resultado,
-            "Producto con caducidad en el mes actual no ha expirado; el apartado debe permitirse");
+        assertDoesNotThrow(() -> dao.separarProducto(id, FECHA));
     }
 
-    // =========================================================================
-    // TC-04: Producto sin existencias (existencias = 0) → sin apartado en BD
-    // =========================================================================
-
     @Test
-    @DisplayName("TC-04: Producto sin existencias → separarProducto no registra apartado")
-    void tc04_productoSinExistencias_noRegistraApartado() throws SQLException {
-        int id = insertarProducto("Vitamina C", 0, caducidadFutura());
+    @DisplayName("TC-04: Producto sin existencias → apartado rechazado")
+    void tc04_productoSinExistencias_rechazado() throws SQLException {
+        int id = bd.insertarProducto("Vitamina C", 0, BdPrueba.mes(3));
 
-        try {
-            dao.separarProducto(id, "2026-05-18");
-        } catch (Exception ignored) {
-            // HeadlessException esperada en entorno sin GUI
-        }
+        OperacionRechazadaException e = assertThrows(OperacionRechazadaException.class,
+                () -> dao.separarProducto(id, FECHA));
 
-        assertNull(fechaSeparadoEnBD(id),
-            "Producto sin existencias no debe tener fecha_separado registrada");
+        assertTrue(e.getMessage().contains("existencias"), e.getMessage());
+        assertNull(bd.fechaApartado(id));
     }
 
-    // =========================================================================
-    // TC-05: ID de producto inexistente → retorna false
-    // =========================================================================
-
     @Test
-    @DisplayName("TC-05: ID de producto inexistente → separarProducto retorna false")
-    void tc05_productoInexistente_retornaFalse() throws SQLException {
-        boolean resultado = dao.separarProducto(9999, "2026-05-18");
-
-        assertFalse(resultado, "ID inexistente debe retornar false");
+    @DisplayName("TC-05: ID de producto inexistente → apartado rechazado")
+    void tc05_productoInexistente_rechazado() {
+        assertThrows(OperacionRechazadaException.class, () -> dao.separarProducto(9999, FECHA));
     }
 
-    // =========================================================================
-    // TC-06: Caducidad corrupta → sin apartado en BD (MR-008 OPC-A)
-    // =========================================================================
-
     @Test
-    @DisplayName("TC-06: Producto con caducidad corrupta → separarProducto no registra apartado")
-    void tc06_caducidadCorrupta_noRegistraApartado() throws SQLException {
-        int id = insertarProducto("Med-Basura", 10, "no-es-fecha");
+    @DisplayName("TC-06: Producto con caducidad corrupta → apartado rechazado")
+    void tc06_caducidadCorrupta_rechazado() throws SQLException {
+        int id = bd.insertarProducto("Med-Basura", 10, "no-es-fecha");
 
-        try {
-            dao.separarProducto(id, "2026-05-18");
-        } catch (Exception ignored) {
-            // HeadlessException esperada en entorno sin GUI; lo relevante es el estado de la BD
-        }
+        assertThrows(OperacionRechazadaException.class, () -> dao.separarProducto(id, FECHA));
 
-        assertNull(fechaSeparadoEnBD(id),
-            "Producto con caducidad corrupta no debe tener fecha_separado registrada");
+        assertNull(bd.fechaApartado(id));
     }
 }

@@ -1,19 +1,17 @@
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.util.Properties;
+import java.awt.GraphicsEnvironment;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
-import javax.swing.UIManager;
-
-import com.formdev.flatlaf.FlatDarkLaf;
-import com.formdev.flatlaf.FlatLightLaf;
 
 import controller.InventarioController;
 import model.InventarioDAO;
+import util.PreferenciasTema;
+import util.Registro;
 import util.RutasApp;
 import view.InventarioView;
+import view.Tema;
 
 /**
  * Punto de entrada de ALFA-INVENTORY.
@@ -23,6 +21,8 @@ import view.InventarioView;
  * se actualiza en tiempo de ejecución desde {@link view.InventarioView}.
  */
 public class InventarioApp {
+
+    private static final Logger LOG = Registro.de(InventarioApp.class);
 
     /**
      * [MR-006 – OPC-A] Ruta del archivo de configuración de preferencias de usuario.
@@ -37,6 +37,11 @@ public class InventarioApp {
      * @param args Argumentos de línea de comandos (no utilizados).
      */
     public static void main(String[] args) {
+        // [MR-010] Errores y eventos quedan en <carpeta de la app>/logs/alfa-N.log
+        Registro.configurarArchivo(RutasApp.directorioBase().resolve("logs"));
+        instalarManejadorDeErrores();
+        LOG.info("Iniciando ALFA-INVENTORY en " + RutasApp.directorioBase());
+
         aplicarTema(leerTema());
         SwingUtilities.invokeLater(() -> {
             InventarioDAO dao;
@@ -45,7 +50,7 @@ public class InventarioApp {
                 dao = new InventarioDAO();
             } catch (IllegalStateException e) {
                 // [FIX-009] Antes el error se imprimía y la app seguía con una conexión nula.
-                e.printStackTrace();
+                LOG.log(Level.SEVERE, "No se pudo abrir la base de datos", e);
                 JOptionPane.showMessageDialog(null,
                         "No se pudo abrir la base de datos:\n" + e.getMessage(),
                         "Error al iniciar", JOptionPane.ERROR_MESSAGE);
@@ -58,38 +63,39 @@ public class InventarioApp {
     }
 
     /**
+     * [MR-010] Cualquier excepción no controlada (incluidas las del hilo de Swing) se
+     * registra en el log y se avisa al usuario, en lugar de perderse en la consola.
+     */
+    static void instalarManejadorDeErrores() {
+        Thread.setDefaultUncaughtExceptionHandler((hilo, error) -> {
+            LOG.log(Level.SEVERE, "Error no controlado en el hilo " + hilo.getName(), error);
+            if (!GraphicsEnvironment.isHeadless()) {
+                SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(null,
+                        "Ocurrió un error inesperado y la operación no se completó.\n"
+                                + "El detalle quedó guardado en: " + RutasApp.directorioBase().resolve("logs"),
+                        "Error", JOptionPane.ERROR_MESSAGE));
+            }
+        });
+    }
+
+    /**
      * [MR-006 – OPC-A] Lee el valor {@code theme} de {@code config.properties}.
      * Si el archivo no existe o la lectura falla, retorna {@code "light"} por defecto.
      *
      * @return {@code "dark"} o {@code "light"}.
      */
     public static String leerTema() {
-        Properties props = new Properties();
-        File cfg = new File(CONFIG_PATH);
-        if (cfg.exists()) {
-            try (FileInputStream fis = new FileInputStream(cfg)) {
-                props.load(fis);
-            } catch (IOException ignored) { }
-        }
-        return props.getProperty("theme", "light");
+        return PreferenciasTema.leer();
     }
 
     /**
-     * [MR-006 – OPC-A] Aplica {@link FlatDarkLaf} si {@code tema} es {@code "dark"},
-     * {@link FlatLightLaf} en cualquier otro caso. Los errores se imprimen en stderr
-     * sin interrumpir el arranque.
+     * [MR-006 – OPC-A] Aplica {@link com.formdev.flatlaf.FlatDarkLaf} si {@code tema} es
+     * {@code "dark"}, {@link com.formdev.flatlaf.FlatLightLaf} en cualquier otro caso.
+     * Los errores se registran sin interrumpir el arranque.
      *
      * @param tema Cadena leída desde {@code config.properties}.
      */
     public static void aplicarTema(String tema) {
-        try {
-            if ("dark".equalsIgnoreCase(tema)) {
-                UIManager.setLookAndFeel(new FlatDarkLaf());
-            } else {
-                UIManager.setLookAndFeel(new FlatLightLaf());
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        Tema.aplicar(tema);
     }
 }

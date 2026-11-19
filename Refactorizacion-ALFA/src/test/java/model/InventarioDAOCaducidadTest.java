@@ -1,305 +1,195 @@
 package model;
 
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.time.YearMonth;
-import java.time.format.DateTimeFormatter;
-
-import org.junit.jupiter.api.AfterEach;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.sql.SQLException;
+import java.util.List;
+
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import prueba.BdPrueba;
+
 /**
- * PRU-003-01 — Pruebas Unitarias: validación de caducidad en registrarVenta
- * y regla de expiración en obtenerMedicamentosProximosACaducar /
- * obtenerMedicamentosCaducados (MR-003 OPC-A).
+ * PRU-003-01 — Validación de caducidad en registrarVenta y regla de expiración en
+ * obtenerMedicamentosProximosACaducar / obtenerMedicamentosCaducados (MR-003, MR-008).
  *
- * <p>Usa SQLite en memoria para aislamiento total. No hay JOptionPane en los
- * flujos de éxito; los flujos de error que llaman a JOptionPane se documentan
- * como pruebas manuales en P9_Pruebas-Funcionales_MR-003.html.
+ * <p>[MR-010] Los flujos de error ya no muestran diálogos: lanzan
+ * {@link OperacionRechazadaException}, así que se verifican directamente con su mensaje.
  */
 @DisplayName("PRU-003-01 | InventarioDAO — validación de caducidad (MR-003)")
 class InventarioDAOCaducidadTest {
 
-    private Connection connection;
+    private BdPrueba bd;
     private InventarioDAO dao;
-
-    private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM");
-
-    // -------------------------------------------------------------------------
-    // Ciclo de vida
-    // -------------------------------------------------------------------------
 
     @BeforeEach
     void setUp() throws SQLException {
-        connection = DriverManager.getConnection("jdbc:sqlite::memory:");
-        crearEsquema();
-        dao = new InventarioDAO(connection);
+        bd = BdPrueba.nueva();
+        dao = bd.dao;
     }
 
     @AfterEach
     void tearDown() throws SQLException {
-        if (connection != null && !connection.isClosed()) connection.close();
+        bd.close();
     }
 
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
-
-    private void crearEsquema() throws SQLException {
-        try (Statement stmt = connection.createStatement()) {
-            stmt.execute(
-                "CREATE TABLE IF NOT EXISTS productos (" +
-                "id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT, " +
-                "existencias INTEGER, lote TEXT, caducidad TEXT, " +
-                "fechaEntrada TEXT, fecha_separado TEXT)"
-            );
-            stmt.execute(
-                "CREATE TABLE IF NOT EXISTS historial_ventas (" +
-                "id INTEGER PRIMARY KEY AUTOINCREMENT, idProducto INTEGER, " +
-                "nombre TEXT, cantidad INTEGER, fechaVenta TEXT, " +
-                "FOREIGN KEY (idProducto) REFERENCES productos(id) ON DELETE CASCADE)"
-            );
-        }
+    /** Caducidad que ya expiró (hace 2 meses). */
+    private static String caducidadExpirada() {
+        return BdPrueba.mes(-2);
     }
 
-    private int insertarProducto(String nombre, int existencias, String caducidad) throws SQLException {
-        String sql = "INSERT INTO productos (nombre, existencias, lote, caducidad, fechaEntrada) VALUES (?, ?, ?, ?, ?)";
-        try (PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            ps.setString(1, nombre);
-            ps.setInt(2, existencias);
-            ps.setString(3, "L-TEST");
-            ps.setString(4, caducidad);
-            ps.setString(5, "2025-01-01");
-            ps.executeUpdate();
-            ResultSet keys = ps.getGeneratedKeys();
-            return keys.next() ? keys.getInt(1) : -1;
-        }
+    /** Caducidad = mes actual: expira el 1.º del mes que viene, todavía vigente. */
+    private static String caducidadMesActual() {
+        return BdPrueba.mes(0);
     }
 
-    /** Caducidad que ya expiró (mes de hace 2 meses → expiryDate = hace 1 mes). */
-    private String caducidadExpirada() {
-        return YearMonth.now().minusMonths(2).format(FMT);
-    }
-
-    /** Caducidad que expira este mes → expiryDate = primer día del mes que viene (futuro). */
-    private String caducidadMesActual() {
-        return YearMonth.now().format(FMT);
-    }
-
-    /** Caducidad que expira en 3 meses → expiryDate muy en el futuro. */
-    private String caducidadFutura() {
-        return YearMonth.now().plusMonths(3).format(FMT);
+    /** Caducidad dentro de 3 meses. */
+    private static String caducidadFutura() {
+        return BdPrueba.mes(3);
     }
 
     // =========================================================================
-    // TC-01 a TC-03: registrarVenta — validación de caducidad
+    // TC-01 a TC-04: registrarVenta — validación de caducidad
     // =========================================================================
 
     @Test
-    @DisplayName("TC-01: Producto vigente → registrarVenta retorna true")
-    void tc01_productoVigente_registrarVentaRetornaTrue() throws SQLException {
-        int id = insertarProducto("Amoxicilina", 50, caducidadFutura());
+    @DisplayName("TC-01: Producto vigente → registrarVenta procede")
+    void tc01_productoVigente_registraVenta() throws SQLException {
+        int id = bd.insertarProducto("Amoxicilina", 50, caducidadFutura());
 
-        boolean resultado = dao.registrarVenta(id, "Amoxicilina", 5);
-
-        assertTrue(resultado, "Producto con caducidad futura debe registrar venta sin problemas");
+        assertDoesNotThrow(() -> dao.registrarVenta(id, 5));
+        assertEquals(1, bd.contar("historial_ventas"));
     }
 
     @Test
     @DisplayName("TC-02: Producto con caducidad = mes actual → aún vigente, venta permitida")
     void tc02_caducidadMesActual_ventaPermitida() throws SQLException {
-        int id = insertarProducto("Paracetamol", 30, caducidadMesActual());
+        int id = bd.insertarProducto("Paracetamol", 30, caducidadMesActual());
 
-        boolean resultado = dao.registrarVenta(id, "Paracetamol", 1);
-
-        assertTrue(resultado,
-            "Un producto cuyo mes de caducidad es el actual no ha expirado aún; la venta debe permitirse");
+        assertDoesNotThrow(() -> dao.registrarVenta(id, 1));
     }
 
     @Test
-    @DisplayName("TC-03: Producto caducado (mes ya pasó) → registrarVenta retorna false sin vender")
-    void tc03_productoCaducado_registrarVentaRetornaFalse() throws SQLException {
-        int id = insertarProducto("Ibuprofeno", 20, caducidadExpirada());
+    @DisplayName("TC-03: Producto caducado (mes ya pasó) → venta rechazada sin registrar")
+    void tc03_productoCaducado_ventaRechazada() throws SQLException {
+        int id = bd.insertarProducto("Ibuprofeno", 20, caducidadExpirada());
 
-        // En entorno headless el JOptionPane lanza HeadlessException antes del return false.
-        // Validamos que la venta no se registra comprobando historial_ventas.
-        try {
-            dao.registrarVenta(id, "Ibuprofeno", 1);
-        } catch (Exception ignored) {
-            // HeadlessException esperada; lo relevante es que no haya registro
-        }
+        OperacionRechazadaException e = assertThrows(OperacionRechazadaException.class,
+                () -> dao.registrarVenta(id, 1));
 
-        try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM historial_ventas")) {
-            assertTrue(rs.next());
-            assertEquals(0, rs.getInt(1), "No debe existir ningún registro en historial_ventas para producto caducado");
-        }
+        assertTrue(e.getMessage().contains("caducado"), e.getMessage());
+        assertEquals(0, bd.contar("historial_ventas"));
+        assertEquals(20, bd.existencias(id));
     }
 
     @Test
     @DisplayName("TC-04: Producto vigente → existencias se decrementan tras la venta")
-    void tc04_productoVigente_existenciasDecrementan() throws SQLException {
-        int id = insertarProducto("Vitamina C", 100, caducidadFutura());
+    void tc04_productoVigente_existenciasDecrementan() throws Exception {
+        int id = bd.insertarProducto("Vitamina C", 100, caducidadFutura());
 
-        dao.registrarVenta(id, "Vitamina C", 10);
+        dao.registrarVenta(id, 10);
 
-        try (PreparedStatement ps = connection.prepareStatement(
-                "SELECT existencias FROM productos WHERE id = ?")) {
-            ps.setInt(1, id);
-            ResultSet rs = ps.executeQuery();
-            assertTrue(rs.next());
-            assertEquals(90, rs.getInt("existencias"), "Existencias deben reducirse en la cantidad vendida");
-        }
+        assertEquals(90, bd.existencias(id));
     }
 
     // =========================================================================
-    // TC-05 a TC-08: obtenerMedicamentosProximosACaducar — nueva regla
+    // TC-05 a TC-08: próximos a caducar / caducados
     // =========================================================================
 
     @Test
     @DisplayName("TC-05: Producto con caducidad = mes actual → aparece en próximos a caducar")
     void tc05_caducidadMesActual_apareceEnProximos() throws SQLException {
-        insertarProducto("Med-A", 10, caducidadMesActual());
+        bd.insertarProducto("Med-A", 10, caducidadMesActual());
 
-        var proximos = dao.obtenerMedicamentosProximosACaducar(31);
-
-        assertFalse(proximos.isEmpty(),
-            "Producto con caducidad = mes actual debe aparecer en próximos a caducar");
+        assertFalse(dao.obtenerMedicamentosProximosACaducar(31).isEmpty());
     }
 
     @Test
-    @DisplayName("TC-06: Producto caducado (mes ya pasó) → NO aparece en próximos a caducar")
+    @DisplayName("TC-06: Producto caducado → NO aparece en próximos a caducar")
     void tc06_caducidadExpirada_noApareceEnProximos() throws SQLException {
-        insertarProducto("Med-B", 10, caducidadExpirada());
+        bd.insertarProducto("Med-B", 10, caducidadExpirada());
 
-        var proximos = dao.obtenerMedicamentosProximosACaducar(31);
-
-        assertTrue(proximos.isEmpty(),
-            "Producto caducado no debe aparecer en próximos a caducar");
+        assertTrue(dao.obtenerMedicamentosProximosACaducar(31).isEmpty());
     }
-
-    // =========================================================================
-    // TC-07 a TC-08: obtenerMedicamentosCaducados — nueva regla
-    // =========================================================================
 
     @Test
     @DisplayName("TC-07: Producto con caducidad = mes actual → NO aparece en caducados")
     void tc07_caducidadMesActual_noApareceEnCaducados() throws SQLException {
-        insertarProducto("Med-C", 10, caducidadMesActual());
+        bd.insertarProducto("Med-C", 10, caducidadMesActual());
 
-        var caducados = dao.obtenerMedicamentosCaducados();
-
-        assertTrue(caducados.isEmpty(),
-            "Producto cuyo mes de caducidad es el actual no debe aparecer como caducado");
+        assertTrue(dao.obtenerMedicamentosCaducados().isEmpty());
     }
 
     @Test
-    @DisplayName("TC-08: Producto caducado (mes ya pasó) → aparece en caducados")
+    @DisplayName("TC-08: Producto caducado → aparece en caducados")
     void tc08_caducidadExpirada_apareceEnCaducados() throws SQLException {
-        insertarProducto("Med-D", 10, caducidadExpirada());
+        bd.insertarProducto("Med-D", 10, caducidadExpirada());
 
-        var caducados = dao.obtenerMedicamentosCaducados();
-
-        assertFalse(caducados.isEmpty(),
-            "Producto cuyo mes de caducidad ya pasó debe aparecer en la lista de caducados");
+        assertFalse(dao.obtenerMedicamentosCaducados().isEmpty());
     }
 
     // =========================================================================
-    // TC-09 a TC-13: parseo seguro de caducidad (MR-008 OPC-A)
+    // TC-09 a TC-13: caducidad corrupta (MR-008)
     // =========================================================================
 
     @Test
-    @DisplayName("TC-09: registrarVenta con caducidad null → no registra venta")
-    void tc09_caducidadNull_registrarVentaNoRegistra() throws SQLException {
-        int id = insertarProducto("Med-Null", 10, null);
+    @DisplayName("TC-09: registrarVenta con caducidad null → rechazada sin registrar")
+    void tc09_caducidadNull_ventaRechazada() throws SQLException {
+        int id = bd.insertarProducto("Med-Null", 10, null);
 
-        // En entorno headless el JOptionPane lanza HeadlessException antes del return false.
-        try {
-            dao.registrarVenta(id, "Med-Null", 1);
-        } catch (Exception ignored) {
-            // HeadlessException esperada
-        }
+        OperacionRechazadaException e = assertThrows(OperacionRechazadaException.class,
+                () -> dao.registrarVenta(id, 1));
 
-        try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM historial_ventas")) {
-            assertTrue(rs.next());
-            assertEquals(0, rs.getInt(1),
-                "No debe existir registro en historial_ventas cuando la caducidad es null");
-        }
+        assertTrue(e.getMessage().contains("formato válido"), e.getMessage());
+        assertEquals(0, bd.contar("historial_ventas"));
     }
 
     @Test
-    @DisplayName("TC-10: registrarVenta con caducidad vacía → no registra venta")
-    void tc10_caducidadVacia_registrarVentaNoRegistra() throws SQLException {
-        int id = insertarProducto("Med-Vacio", 10, "");
+    @DisplayName("TC-10: registrarVenta con caducidad vacía → rechazada sin registrar")
+    void tc10_caducidadVacia_ventaRechazada() throws SQLException {
+        int id = bd.insertarProducto("Med-Vacio", 10, "");
 
-        try {
-            dao.registrarVenta(id, "Med-Vacio", 1);
-        } catch (Exception ignored) {
-            // HeadlessException esperada
-        }
-
-        try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM historial_ventas")) {
-            assertTrue(rs.next());
-            assertEquals(0, rs.getInt(1),
-                "No debe existir registro en historial_ventas cuando la caducidad es vacía");
-        }
+        assertThrows(OperacionRechazadaException.class, () -> dao.registrarVenta(id, 1));
+        assertEquals(0, bd.contar("historial_ventas"));
     }
 
     @Test
-    @DisplayName("TC-11: registrarVenta con caducidad mal formada → no registra venta")
-    void tc11_caducidadMalFormada_registrarVentaNoRegistra() throws SQLException {
-        int id = insertarProducto("Med-Basura", 10, "2025-13");
+    @DisplayName("TC-11: registrarVenta con caducidad mal formada → rechazada sin registrar")
+    void tc11_caducidadMalFormada_ventaRechazada() throws SQLException {
+        int id = bd.insertarProducto("Med-Basura", 10, "2025-13");
 
-        try {
-            dao.registrarVenta(id, "Med-Basura", 1);
-        } catch (Exception ignored) {
-            // HeadlessException esperada
-        }
-
-        try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM historial_ventas")) {
-            assertTrue(rs.next());
-            assertEquals(0, rs.getInt(1),
-                "No debe existir registro en historial_ventas cuando la caducidad está mal formada");
-        }
+        assertThrows(OperacionRechazadaException.class, () -> dao.registrarVenta(id, 1));
+        assertEquals(0, bd.contar("historial_ventas"));
     }
 
     @Test
     @DisplayName("TC-12: obtenerMedicamentosProximosACaducar omite fila corrupta y devuelve el resto")
-    void tc12_proximosACaducar_omiteCorruptoYDevuelveResto() throws SQLException {
-        insertarProducto("Med-Corrupto", 10, "no-es-fecha");
-        insertarProducto("Med-Valido", 10, caducidadMesActual());
+    void tc12_proximosACaducar_omiteCorrupto() throws SQLException {
+        bd.insertarProducto("Med-Corrupto", 10, "no-es-fecha");
+        bd.insertarProducto("Med-Valido", 10, caducidadMesActual());
 
-        var proximos = dao.obtenerMedicamentosProximosACaducar(31);
+        List<Producto> proximos = dao.obtenerMedicamentosProximosACaducar(31);
 
-        assertEquals(1, proximos.size(),
-            "Debe omitir el registro con caducidad corrupta y devolver solo el válido");
-        assertEquals("Med-Valido", proximos.get(0)[1],
-            "El registro devuelto debe corresponder al producto con caducidad válida");
+        assertEquals(1, proximos.size());
+        assertEquals("Med-Valido", proximos.get(0).nombre());
     }
 
     @Test
     @DisplayName("TC-13: obtenerMedicamentosCaducados omite fila corrupta y devuelve el resto")
-    void tc13_caducados_omiteCorruptoYDevuelveResto() throws SQLException {
-        insertarProducto("Med-Corrupto", 10, null);
-        insertarProducto("Med-Caducado", 10, caducidadExpirada());
+    void tc13_caducados_omiteCorrupto() throws SQLException {
+        bd.insertarProducto("Med-Corrupto", 10, null);
+        bd.insertarProducto("Med-Caducado", 10, caducidadExpirada());
 
-        var caducados = dao.obtenerMedicamentosCaducados();
+        List<Producto> caducados = dao.obtenerMedicamentosCaducados();
 
-        assertEquals(1, caducados.size(),
-            "Debe omitir el registro con caducidad corrupta y devolver solo el caducado válido");
-        assertEquals("Med-Caducado", caducados.get(0)[1],
-            "El registro devuelto debe corresponder al producto con caducidad válida");
+        assertEquals(1, caducados.size());
+        assertEquals("Med-Caducado", caducados.get(0).nombre());
     }
 }
