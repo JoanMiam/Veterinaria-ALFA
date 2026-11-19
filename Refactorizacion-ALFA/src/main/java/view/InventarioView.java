@@ -14,11 +14,8 @@ import java.awt.event.MouseMotionAdapter;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Properties;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -33,17 +30,13 @@ import javax.swing.JTextField;
 import javax.swing.JToggleButton;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingUtilities;
-import javax.swing.UIManager;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableRowSorter;
 
-import com.formdev.flatlaf.FlatDarkLaf;
-import com.formdev.flatlaf.FlatLightLaf;
-
 import controller.InventarioController;
 import model.ReglasCaducidad;
-import util.RutasApp;
+import util.PreferenciasTema;
 
 public class InventarioView {
     private JFrame frame;
@@ -177,30 +170,18 @@ public class InventarioView {
         rightPanel.add(btnToggleColores);
 
         // [MR-006 – OPC-A] Botón para alternar entre tema claro y oscuro (FlatLaf)
-        String temaInicial = leerTema();
-        JToggleButton btnTema = new JToggleButton(
-                "dark".equalsIgnoreCase(temaInicial) ? "Tema: Oscuro" : "Tema: Claro");
-        btnTema.setSelected("dark".equalsIgnoreCase(temaInicial));
+        boolean temaOscuro = PreferenciasTema.esOscuro(PreferenciasTema.leer());
+        JToggleButton btnTema = new JToggleButton(temaOscuro ? "Tema: Oscuro" : "Tema: Claro");
+        btnTema.setSelected(temaOscuro);
         btnTema.setFont(new Font("Arial", Font.BOLD, 14));
         btnTema.setFocusPainted(false);
         btnTema.setBackground(new Color(30, 136, 229));
         btnTema.setForeground(Color.WHITE);
         btnTema.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
         btnTema.addActionListener(e -> {
-            String nuevoTema = btnTema.isSelected() ? "dark" : "light";
             btnTema.setText(btnTema.isSelected() ? "Tema: Oscuro" : "Tema: Claro");
-            try {
-                if (btnTema.isSelected()) {
-                    UIManager.setLookAndFeel(new FlatDarkLaf());
-                } else {
-                    UIManager.setLookAndFeel(new FlatLightLaf());
-                }
-                SwingUtilities.updateComponentTreeUI(frame);
-                frame.pack();
-            } catch (Exception ex) {
-                ex.printStackTrace();
-            }
-            guardarTema(nuevoTema);
+            // [MR-010] Lógica de tema centralizada; ya no encoge la ventana con pack().
+            Tema.cambiar(btnTema.isSelected() ? PreferenciasTema.OSCURO : PreferenciasTema.CLARO);
         });
         rightPanel.add(btnTema);
 
@@ -421,40 +402,6 @@ public class InventarioView {
 
     public JFrame getFrame() {
         return frame;
-    }
-
-    /**
-     * [MR-006 – OPC-A] Lee el valor {@code theme} de {@code config.properties}
-     * ([FIX-009] junto al ejecutable, ver {@link RutasApp}). Retorna {@code "light"}
-     * si el archivo no existe o la clave no está definida.
-     *
-     * @return {@code "dark"} o {@code "light"}.
-     */
-    private String leerTema() {
-        Properties props = new Properties();
-        File cfg = RutasApp.archivoConfiguracion().toFile();
-        if (cfg.exists()) {
-            try (java.io.FileInputStream fis = new java.io.FileInputStream(cfg)) {
-                props.load(fis);
-            } catch (IOException ignored) { }
-        }
-        return props.getProperty("theme", "light");
-    }
-
-    /**
-     * [MR-006 – OPC-A] Persiste la preferencia de tema en {@code config.properties}
-     * ([FIX-009] junto al ejecutable) para que el arranque siguiente aplique el mismo tema.
-     *
-     * @param tema {@code "light"} o {@code "dark"}.
-     */
-    private void guardarTema(String tema) {
-        Properties props = new Properties();
-        props.setProperty("theme", tema);
-        try (FileOutputStream fos = new FileOutputStream(RutasApp.archivoConfiguracion().toFile())) {
-            props.store(fos, "MR-006 – OPC-A: preferencia de tema visual");
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
     }
 
     /**

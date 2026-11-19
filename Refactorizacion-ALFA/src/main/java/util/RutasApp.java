@@ -89,7 +89,7 @@ public final class RutasApp {
             Path legadoAbs = legado.toAbsolutePath().normalize();
             if (!legadoAbs.equals(destinoAbs) && Files.isRegularFile(legadoAbs)) {
                 Files.copy(legadoAbs, destinoAbs);
-                System.out.println("[RutasApp] Base de datos previa copiada de " + legadoAbs + " a " + destinoAbs);
+                Registro.de(RutasApp.class).info("Base de datos previa copiada de " + legadoAbs + " a " + destinoAbs);
             }
         }
         return destinoAbs;
